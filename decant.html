@@ -1,0 +1,2150 @@
+<!DOCTYPE html>
+<html lang="en" data-backdrop="peach">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Decant</title>
+<!--
+==========================================================================
+  DECANT - a water sort puzzle in one file
+==========================================================================
+  SECTION MAP (search for the code, e.g. "S6" or "C4", to jump there)
+
+  STYLE (the style block)
+    S1  Fonts ................ font families and weights
+    S2  Colours .............. default light and dark scheme, liquid sets,
+                               fixed colours (gold, cork, coin, gloss)
+    S3  Shop backdrops ....... one colour scheme per backdrop
+    S4  Glass buttons/cards .. the frosted "liquid glass" look
+    S5  Game layout .......... page column, top bar, board, action buttons
+    S6  Tubes and liquid ..... tube shapes (one block per shop tube), bands
+    S7  Home / shop / pop-ups
+    S8  Animations ........... CSS timings and keyframes
+
+  PAGE (the body)
+    P1  Game screen
+    P2  Home screen
+    P3  Shop screen
+    P4  Pop-ups (win, awards) and the symbol shapes
+
+  SETTINGS (first script block: the CONFIG object)
+    C1  Text ................. every label and message
+    C2  Images ............... optional picture paths ("" = built-in drawing)
+    C3  Levels ............... capacity, empty tubes, colours per level, coins
+    C4  Shop ................. tubes, backdrops, colour sets
+    C5  Awards
+    C6  Sound and vibration
+    C7  Animation timings .... the pour sequence and confetti (CSS timings are in S8)
+    C8  Layout numbers ....... tube proportions used to fit the board
+
+  ENGINE (second script block)  puzzle rules, level generator, solver.
+                               No screen code. Reads its numbers from CONFIG.
+  SCREENS (third script block)  drawing, touch, sound, saving, shop, awards.
+
+  HOW THINGS LINK UP
+    - A shop tube "id" in C4 matches a [data-tube="id"] block in S6.
+    - A backdrop "id" in C4 matches a [data-backdrop="id"] block in S3.
+    - A colour set "id" in C4 matches a [data-colours="id"] block in S2.
+    To add one, add both the CSS block and the CONFIG entry.
+==========================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400..700&display=swap" rel="stylesheet">
+
+<style>
+/* =======================================================================
+   S1  FONTS
+   ======================================================================= */
+:root {
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif; /* title, level numbers, headings */
+  --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; /* everything else */
+  --fw-display: 800;   /* weight of headings */
+  --fw-strong: 600;    /* weight of button labels */
+}
+
+/* =======================================================================
+   S2  COLOURS
+   The "aurora" backdrop has a light and a dark version that
+   follow the device theme. Every colour used anywhere is a variable here
+   or in S3.
+   ======================================================================= */
+:root, [data-backdrop="aurora"] {
+  color-scheme: light;
+  --bg-base: #eef0fb;                       /* page base colour */
+  --blob-1: #ffc4dc;                        /* top-left wash */
+  --blob-2: #b5d9ff;                        /* right wash */
+  --blob-3: #c4f3d9;                        /* bottom wash */
+  --text: #1b2140;                          /* main text */
+  --text-soft: #535d86;                     /* secondary text */
+  --accent: #5566f5;                        /* accent (focus, hint outline, glow) */
+  --accent-glass: rgba(85, 102, 245, .78);  /* tinted glass: Play button, selected tab */
+  --accent-ink: #ffffff;                    /* text on tinted glass */
+  --accent-glow: rgba(85, 102, 245, .45);   /* glow tube halo */
+  --glass-fill: rgba(255, 255, 255, .42);   /* frosted fill */
+  --glass-rim: rgba(255, 255, 255, .88);    /* bright 1px rim */
+  --glass-shadow: rgba(38, 48, 110, .16);   /* soft drop shadow */
+  --glass-highlight: rgba(255, 255, 255, .95); /* inner top highlight */
+  --card-fill: rgba(255, 255, 255, .72);    /* pop-up cards (more solid) */
+  --scrim: rgba(28, 34, 70, .30);           /* dim layer behind pop-ups */
+  --tube-fill: rgba(255, 255, 255, .30);    /* empty glass */
+  --tube-outline: rgba(58, 70, 130, .55);   /* tube outline */
+  --tube-shadow: rgba(38, 48, 110, .18);    /* tube shadow */
+  --tube-shine: rgba(255, 255, 255, .65);   /* vertical shine stripe */
+  --shelf: rgba(58, 70, 130, .30);          /* shelf line */
+  --focus: #1b2140;                         /* keyboard focus ring */
+  --ok: #1c9a5e;                            /* earned award tick */
+}
+@media (prefers-color-scheme: dark) {
+  :root, [data-backdrop="aurora"] {
+    color-scheme: dark;
+    --bg-base: #101228;
+    --blob-1: #5b2a70;
+    --blob-2: #1d4788;
+    --blob-3: #17635b;
+    --text: #f2f4ff;
+    --text-soft: #aab2d8;
+    --accent: #8b98ff;
+    --accent-glass: rgba(110, 124, 255, .62);
+    --accent-ink: #ffffff;
+    --accent-glow: rgba(139, 152, 255, .55);
+    --glass-fill: rgba(255, 255, 255, .09);
+    --glass-rim: rgba(255, 255, 255, .28);
+    --glass-shadow: rgba(0, 0, 0, .38);
+    --glass-highlight: rgba(255, 255, 255, .24);
+    --card-fill: rgba(36, 40, 78, .80);
+    --scrim: rgba(4, 6, 20, .58);
+    --tube-fill: rgba(255, 255, 255, .07);
+    --tube-outline: rgba(255, 255, 255, .55);
+    --tube-shadow: rgba(0, 0, 0, .38);
+    --tube-shine: rgba(255, 255, 255, .34);
+    --shelf: rgba(255, 255, 255, .24);
+    --focus: #ffffff;
+    --ok: #55d99a;
+  }
+}
+
+/* Fixed colours: the same on every backdrop */
+:root {
+  --gold: #d9a520;                       /* gilded tube, coin */
+  --gold-light: #ffe28a;                 /* coin and gilded highlight */
+  --gold-deep: #a87508;                  /* coin edge */
+  --cork-light: #d9b98a;                 /* cork highlight */
+  --cork: #b88a52;                       /* cork */
+  --cork-deep: #8a6234;                  /* cork shadow side */
+  --gloss-light: rgba(255, 255, 255, .34); /* left side of the liquid gloss */
+  --gloss-dark: rgba(0, 0, 0, .14);      /* right side of the liquid gloss */
+  --surface-line: rgba(255, 255, 255, .6); /* light line on the top band */
+  --sym-fill: #ffffff;                   /* colour-blind symbol fill */
+  --sym-line: rgba(0, 0, 0, .55);        /* colour-blind symbol outline */
+  --hand-fill: #ffffff;                  /* tutorial hand */
+  --hand-line: #1b2140;                  /* tutorial hand outline */
+  --confetti-light: #ffffff;             /* white pieces mixed into the confetti */
+}
+
+/* Liquid colour sets. Order: red, orange, yellow, green, teal, sky, blue,
+   violet, pink, brown, lime, slate (liq-0 to liq-11). */
+:root, [data-colours="classic"] {
+  --liq-0: #e5484d; --liq-1: #f58a1f; --liq-2: #f6cf2f; --liq-3: #37b24d;
+  --liq-4: #12a594; --liq-5: #49bdf2; --liq-6: #3a5bdc; --liq-7: #8e4ec6;
+  --liq-8: #ee6fae; --liq-9: #9a6233; --liq-10: #a6d820; --liq-11: #7a879b;
+}
+[data-colours="pastel"] {
+  --liq-0: #f29b9b; --liq-1: #f7be8c; --liq-2: #f6e294; --liq-3: #a3dcab;
+  --liq-4: #92d8cd; --liq-5: #a6d6f5; --liq-6: #9fb0f0; --liq-7: #c6aaee;
+  --liq-8: #f4b0d3; --liq-9: #c7a588; --liq-10: #d0ea94; --liq-11: #b2bccb;
+}
+[data-colours="neon"] {
+  --liq-0: #ff2d55; --liq-1: #ff8a00; --liq-2: #fff01f; --liq-3: #2bff6a;
+  --liq-4: #00f5d4; --liq-5: #19c8ff; --liq-6: #3d5afe; --liq-7: #b620ff;
+  --liq-8: #ff3df2; --liq-9: #b0652a; --liq-10: #b6ff00; --liq-11: #8fa3bf;
+}
+
+/* =======================================================================
+   S3  SHOP BACKDROPS
+   Each block replaces the whole colour scheme. The id matches C4.
+   ======================================================================= */
+[data-backdrop="midnight"] {
+  color-scheme: dark;
+  --bg-base: #090b1c; --blob-1: #2a2e7a; --blob-2: #5a1d6c; --blob-3: #0e3a66;
+  --text: #f1f3ff; --text-soft: #a4acd6;
+  --accent: #98a3ff; --accent-glass: rgba(120, 132, 255, .60); --accent-ink: #ffffff; --accent-glow: rgba(152, 163, 255, .55);
+  --glass-fill: rgba(255, 255, 255, .08); --glass-rim: rgba(255, 255, 255, .26); --glass-shadow: rgba(0, 0, 0, .45); --glass-highlight: rgba(255, 255, 255, .22);
+  --card-fill: rgba(26, 29, 64, .84); --scrim: rgba(2, 3, 14, .62);
+  --tube-fill: rgba(255, 255, 255, .06); --tube-outline: rgba(255, 255, 255, .55); --tube-shadow: rgba(0, 0, 0, .45); --tube-shine: rgba(255, 255, 255, .32);
+  --shelf: rgba(255, 255, 255, .22); --focus: #ffffff; --ok: #55d99a;
+}
+[data-backdrop="forest"] {
+  color-scheme: dark;
+  --bg-base: #0d1c15; --blob-1: #1e5a3a; --blob-2: #5f611c; --blob-3: #0e4848;
+  --text: #f0f7ef; --text-soft: #a9c4b0;
+  --accent: #6fdc97; --accent-glass: rgba(70, 180, 115, .62); --accent-ink: #06200f; --accent-glow: rgba(111, 220, 151, .5);
+  --glass-fill: rgba(255, 255, 255, .09); --glass-rim: rgba(255, 255, 255, .26); --glass-shadow: rgba(0, 0, 0, .42); --glass-highlight: rgba(255, 255, 255, .22);
+  --card-fill: rgba(22, 48, 36, .86); --scrim: rgba(2, 12, 7, .60);
+  --tube-fill: rgba(255, 255, 255, .07); --tube-outline: rgba(240, 255, 240, .55); --tube-shadow: rgba(0, 0, 0, .42); --tube-shine: rgba(255, 255, 255, .32);
+  --shelf: rgba(240, 255, 240, .24); --focus: #ffffff; --ok: #6fdc97;
+}
+[data-backdrop="ocean"] {
+  color-scheme: light;
+  --bg-base: #e4f3fb; --blob-1: #8ad0f5; --blob-2: #a2efe2; --blob-3: #b6c4ff;
+  --text: #0e2a44; --text-soft: #44627e;
+  --accent: #0a7fc2; --accent-glass: rgba(10, 127, 194, .80); --accent-ink: #ffffff; --accent-glow: rgba(10, 127, 194, .45);
+  --glass-fill: rgba(255, 255, 255, .44); --glass-rim: rgba(255, 255, 255, .9); --glass-shadow: rgba(14, 60, 100, .18); --glass-highlight: rgba(255, 255, 255, .95);
+  --card-fill: rgba(255, 255, 255, .74); --scrim: rgba(10, 40, 66, .30);
+  --tube-fill: rgba(255, 255, 255, .32); --tube-outline: rgba(14, 62, 104, .55); --tube-shadow: rgba(14, 60, 100, .2); --tube-shine: rgba(255, 255, 255, .7);
+  --shelf: rgba(14, 62, 104, .30); --focus: #0e2a44; --ok: #12915a;
+}
+[data-backdrop="peach"] {
+  color-scheme: light;
+  --bg-base: #fff0e6; --blob-1: #ffbf9b; --blob-2: #ffdba6; --blob-3: #ffb0c6;
+  --text: #46220f; --text-soft: #85573e;
+  --accent: #e7603f; --accent-glass: rgba(231, 96, 63, .82); --accent-ink: #ffffff; --accent-glow: rgba(231, 96, 63, .45);
+  --glass-fill: rgba(255, 255, 255, .44); --glass-rim: rgba(255, 255, 255, .9); --glass-shadow: rgba(120, 60, 30, .17); --glass-highlight: rgba(255, 255, 255, .95);
+  --card-fill: rgba(255, 252, 248, .76); --scrim: rgba(70, 34, 15, .28);
+  --tube-fill: rgba(255, 255, 255, .34); --tube-outline: rgba(120, 62, 34, .55); --tube-shadow: rgba(120, 60, 30, .2); --tube-shine: rgba(255, 255, 255, .7);
+  --shelf: rgba(120, 62, 34, .30); --focus: #46220f; --ok: #1c9a5e;
+}
+
+/* =======================================================================
+   S4  GLASS BUTTONS AND CARDS
+   ======================================================================= */
+:root {
+  --glass-blur: 18px;        /* background blur behind glass */
+  --glass-saturate: 170%;    /* extra colour behind glass */
+  --radius-pill: 999px;      /* pills and round buttons */
+  --radius-tile: 22px;       /* square-ish buttons */
+  --radius-card: 28px;       /* pop-up and shop cards */
+}
+.frost {
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-rim);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 10px 26px var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  color: var(--text);
+}
+.frost.accent { background: var(--accent-glass); color: var(--accent-ink); }
+.btn {
+  font: inherit; font-weight: var(--fw-strong); cursor: pointer;
+  -webkit-appearance: none; appearance: none; margin: 0;
+  touch-action: manipulation;
+  transition: transform var(--t-press-back) var(--spring), opacity .2s ease;
+}
+.btn:active:not(:disabled) { transform: scale(var(--press-scale)); transition-duration: var(--t-press); }
+.btn:disabled { opacity: .42; cursor: default; }
+.btn:focus-visible, .tube:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; font-size: 14px; font-weight: var(--fw-strong); white-space: nowrap; }
+.ico { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ico.solid { fill: currentColor; stroke-width: 1.5; }
+
+/* =======================================================================
+   S5  GAME LAYOUT
+   ======================================================================= */
+:root {
+  --page-max-w: 440px;   /* widest the game column gets */
+  --page-max-h: 880px;   /* tallest the game column gets */
+  --page-pad: 16px;      /* smallest side padding */
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: var(--font-body); font-size: 15px; color: var(--text);
+  background: var(--bg-base); overflow: hidden; overscroll-behavior: none;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-user-select: none; user-select: none;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+}
+/* Background wash: three large soft radial gradients over the base colour */
+#bg {
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(75% 55% at 8% 6%, var(--blob-1), transparent 72%),
+    radial-gradient(70% 55% at 100% 38%, var(--blob-2), transparent 72%),
+    radial-gradient(90% 60% at 35% 108%, var(--blob-3), transparent 72%),
+    var(--bg-base);
+}
+#bg::after { content: ""; position: absolute; inset: 0; background: var(--bg-image, none) center / cover no-repeat; }
+#app {
+  position: relative; z-index: 1; width: 100%; max-width: var(--page-max-w);
+  height: 100vh; height: 100dvh; max-height: var(--page-max-h);
+}
+#fx { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
+#confetti { position: fixed; inset: 0; z-index: 41; width: 100%; height: 100%; pointer-events: none; } /* confetti is drawn here, over everything */
+.screen {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  padding: max(var(--page-pad), env(safe-area-inset-top)) max(var(--page-pad), env(safe-area-inset-right))
+           max(var(--page-pad), env(safe-area-inset-bottom)) max(var(--page-pad), env(safe-area-inset-left));
+  opacity: 0; visibility: hidden; transform: scale(.955);
+  transition: opacity var(--t-screen) ease, transform var(--t-screen) ease, visibility 0s linear var(--t-screen);
+}
+.screen.on { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+
+.topbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; flex: none; }
+.topbar > :first-child { justify-self: start; }
+.topbar > :last-child { justify-self: end; }
+.icon-btn { width: 44px; height: 44px; padding: 0; display: grid; place-items: center; }
+.levelnav { display: flex; align-items: center; gap: 4px; }
+.nav-btn { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; }
+.nav-btn .ico { width: 18px; height: 18px; }
+.level-name { margin: 0 6px; font: var(--fw-display) 24px/1 var(--font-display); letter-spacing: -.01em; white-space: nowrap; }
+
+.board {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: var(--row-gap, 16px);
+}
+.row { position: relative; display: flex; gap: var(--gap, 16px); padding: var(--lift, 20px) 0 var(--shelf-space, 12px); }
+.row::after { /* the thin shelf the tubes stand on */
+  content: ""; position: absolute; left: -10px; right: -10px; bottom: 2px; height: 4px;
+  border-radius: 99px; background: var(--shelf);
+}
+.slot { position: relative; width: var(--tw); height: var(--th); flex: none; }
+
+.status {
+  flex: none; height: 44px; margin: 4px 0 0; display: flex; align-items: center; justify-content: center;
+  text-align: center; font-weight: var(--fw-strong); line-height: 1.25;
+}
+.check { flex: none; align-self: center; display: flex; align-items: center; gap: 9px; padding: 6px 4px; font-size: 14px; color: var(--text-soft); cursor: pointer; }
+.check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.check .box { width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; box-shadow: inset 0 1px 0 var(--glass-highlight); }
+.check .box .ico { width: 16px; height: 16px; stroke-width: 3; opacity: 0; transform: scale(.4); transition: opacity .15s, transform .25s var(--spring); }
+.check input:checked + .box { background: var(--accent-glass); color: var(--accent-ink); }
+.check input:checked + .box .ico { opacity: 1; transform: none; }
+.check input:focus-visible + .box { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+.actions { flex: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 8px; }
+.action { border-radius: var(--radius-tile); padding: 10px 2px 9px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12.5px; white-space: nowrap; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@media (max-width: 350px) {
+  .level-name { font-size: 20px; margin: 0 3px; }
+  .icon-btn { width: 40px; height: 40px; }
+  .nav-btn { width: 30px; height: 30px; }
+  .pill { padding: 8px 10px; font-size: 13px; }
+}
+
+/* =======================================================================
+   S6  TUBES AND LIQUID
+   Sizes (--tw tube width, --th tube height, --bh band height) are worked
+   out by the script from the space available (numbers in C8).
+   ======================================================================= */
+.tube {
+  position: relative; display: block; width: var(--tw); height: var(--th);
+  padding: 0; margin: 0; border: 0; background: none; cursor: pointer;
+  -webkit-appearance: none; appearance: none; border-radius: 8px;
+  transform-origin: 50% 0; touch-action: manipulation;
+  transition: translate var(--t-lift) var(--spring);
+}
+.tube.sel { translate: 0 calc(var(--lift) * -1); }
+.tube.pouring { z-index: 30; }
+.tube[aria-disabled="true"] { cursor: default; }
+.glass {
+  position: absolute; inset: 0; overflow: hidden;
+  border: var(--line, 2px) solid var(--tube-outline);
+  border-top-width: var(--line-top, 0px);
+  border-radius: var(--shape);
+  background: var(--tube-fill);
+  box-shadow: 0 7px 14px var(--tube-shadow), var(--glass-extra, 0 0 0 transparent);
+}
+.tube::before { /* the lip around the mouth */
+  content: ""; position: absolute; z-index: 2; top: var(--lip-top, -2px);
+  left: var(--lip-inset, -3px); right: var(--lip-inset, -3px); height: var(--lip-h, 4px);
+  border-radius: 99px; background: var(--lip-colour, var(--tube-outline));
+}
+.liquid { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column-reverse; }
+.band {
+  position: relative; flex: none; height: var(--bh); overflow: hidden;
+  background: linear-gradient(90deg, var(--gloss-light), transparent 38%, var(--gloss-dark)), var(--c);
+  transition: height 0s linear;
+}
+.band:last-child::after { /* light surface line on the top band */
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--surface-line);
+}
+.shine {
+  position: absolute; z-index: 3; top: 9%; bottom: 16%; left: 15%; width: 15%;
+  border-radius: 99px; background: linear-gradient(to bottom, var(--tube-shine), transparent 88%); pointer-events: none;
+}
+.sym { /* colour-blind symbol, shown when "Show symbols" is ticked */
+  display: none; position: absolute; left: 50%; top: 50%;
+  width: calc(var(--bh) * .62); height: calc(var(--bh) * .62); translate: -50% -50%;
+  fill: var(--sym-fill); stroke: var(--sym-line); stroke-width: 1.8; paint-order: stroke; stroke-linejoin: round;
+}
+.symbols .sym { display: block; }
+.cork {
+  position: absolute; z-index: 4; pointer-events: none;
+  width: var(--cork-w, 62%); left: calc(50% - var(--cork-w, 62%) / 2);
+  top: calc(var(--tw) * -.2); height: calc(var(--tw) * .42);
+  border-radius: 4px 4px 6px 6px;
+  background: linear-gradient(90deg, var(--cork-light), var(--cork) 45%, var(--cork-deep));
+  box-shadow: 0 2px 4px var(--tube-shadow);
+  opacity: 0; translate: 0 -170%;
+  transition: translate var(--t-cork) var(--spring) .08s, opacity .12s linear .08s;
+}
+.tube.done .cork { opacity: 1; translate: 0 0; }
+.tube.pop .glass { animation: pop var(--t-pop) var(--spring); }
+.tube.hint-from { animation: hint-bob .55s ease-in-out infinite alternate; }
+.tube.hint-to .glass { outline: 3px dashed var(--accent); outline-offset: 4px; }
+
+/* --- Tube shapes. One block per shop tube; the id matches C4. --- */
+[data-tube="test"] {                       /* plain round-bottomed test tube */
+  --shape: 3px 3px calc(var(--tw) / 2) calc(var(--tw) / 2);
+}
+[data-tube="vial"] {                       /* shouldered vial with a narrow neck */
+  --shape: calc(var(--tw) * .3) calc(var(--tw) * .3) calc(var(--tw) * .16) calc(var(--tw) * .16);
+  --line-top: var(--line, 2px);
+  --lip-inset: 18%; --lip-h: 8px; --lip-top: -7px; --cork-w: 48%;
+}
+[data-tube="beaker"] {                     /* flat-bottomed beaker with a wide lip and marks */
+  --shape: 2px 2px 6px 6px;
+  --lip-inset: -5px; --lip-h: 4px;
+}
+[data-tube="beaker"] .glass::after {
+  content: ""; position: absolute; z-index: 2; right: 10%; width: 26%; top: 14%; bottom: 5%;
+  background: repeating-linear-gradient(to bottom, var(--tube-outline) 0 1.5px, transparent 1.5px calc(var(--bh) / 2));
+}
+[data-tube="bulb"] {                       /* domed top and deep round bottom */
+  --shape: 42% 42% 50% 50% / 12% 12% 34% 34%;
+  --line-top: var(--line, 2px);
+  --lip-inset: 24%; --lip-h: 7px; --lip-top: -6px; --cork-w: 42%;
+}
+[data-tube="glow"] {                       /* test tube with a glowing accent outline */
+  --shape: 3px 3px calc(var(--tw) / 2) calc(var(--tw) / 2);
+  --tube-outline: var(--accent);
+  --glass-extra: 0 0 16px var(--accent-glow), inset 0 0 12px var(--accent-glow);
+}
+[data-tube="gilded"] {                     /* gold outline, gold lip and collar */
+  --shape: 3px 3px calc(var(--tw) / 2) calc(var(--tw) / 2);
+  --tube-outline: var(--gold); --line: 2.5px;
+  --lip-colour: linear-gradient(90deg, var(--gold-light), var(--gold) 50%, var(--gold-deep));
+  --lip-h: 6px; --lip-top: -3px; --lip-inset: -4px;
+}
+[data-tube="gilded"] .glass::before {
+  content: ""; position: absolute; z-index: 2; left: 0; right: 0; top: calc(var(--tw) * .2); height: 3px;
+  background: linear-gradient(90deg, var(--gold-light), var(--gold) 50%, var(--gold-deep));
+}
+
+/* Pour stream and tutorial hand */
+.stream {
+  position: fixed; border-radius: 99px; transform: scaleY(0); transform-origin: 50% 0;
+  background: linear-gradient(90deg, var(--gloss-light), transparent 40%, var(--gloss-dark)), var(--c);
+  transition: transform linear;
+}
+.hand {
+  position: absolute; z-index: 5; left: 50%; top: calc(100% + 14px); width: 46px; margin-left: -20px;
+  pointer-events: none; animation: bob .6s ease-in-out infinite alternate;
+  filter: drop-shadow(0 4px 6px var(--tube-shadow));
+}
+.hand svg, .hand img { display: block; width: 100%; height: auto; }
+.hand path { fill: var(--hand-fill); stroke: var(--hand-line); stroke-width: 2.5; stroke-linejoin: round; }
+
+/* =======================================================================
+   S7  HOME, SHOP AND POP-UPS
+   ======================================================================= */
+/* --- Home --- */
+#home { align-items: center; justify-content: space-between; text-align: center; padding-top: max(28px, env(safe-area-inset-top)); }
+.title { margin: 0; font: var(--fw-display) clamp(56px, 19vw, 86px)/.95 var(--font-display); letter-spacing: -.035em; }
+.title img { max-width: 78%; height: auto; }
+.tagline { margin: 8px 0 0; font-size: 16px; font-weight: 500; letter-spacing: .02em; color: var(--text-soft); }
+.droplet {
+  width: min(108px, 15vh); height: min(108px, 15vh); margin: 22px 0 10px;
+  border-radius: 0 50% 50% 50%; transform: rotate(45deg); display: grid; place-items: center; flex: none;
+}
+.droplet-in { transform: rotate(-45deg); display: flex; flex-direction: column; align-items: center; line-height: 1; margin-top: 8px; }
+.droplet-in small { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--text-soft); }
+.droplet-in b { font: var(--fw-display) 38px/1 var(--font-display); }
+.droplet.img { background: var(--badge-image) center / contain no-repeat; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; border-radius: 0; transform: none; }
+.droplet.img .droplet-in { transform: none; }
+.play { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-width: 210px; padding: 18px 34px; font: var(--fw-display) 26px/1 var(--font-display); }
+.play .ico { width: 28px; height: 28px; }
+.coin {
+  width: 18px; height: 18px; border-radius: 50%; flex: none;
+  background: var(--coin-image, radial-gradient(circle at 35% 30%, var(--gold-light), var(--gold) 55%, var(--gold-deep)));
+  background-size: cover; box-shadow: inset 0 0 0 2px var(--gold-deep);
+}
+.coin-img .coin { box-shadow: none; border-radius: 0; background-size: contain; background-repeat: no-repeat; background-position: center; }
+.home-row { align-self: stretch; display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.tile { border-radius: var(--radius-tile); padding: 11px 0 9px; display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11.5px; white-space: nowrap; }
+.tile .off-only, .tile.off .on-only { display: none; }
+.tile.off .off-only { display: block; }
+.tile.off .ico { opacity: .55; }
+
+/* --- Shop --- */
+.tabs { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin-top: 14px; }
+.tab { border: 1px solid transparent; background: none; color: var(--text); border-radius: var(--radius-pill); padding: 10px 4px; font-size: 14px; }
+.tab.accent { border-color: var(--glass-rim); box-shadow: inset 0 1px 0 var(--glass-highlight); }
+.shop-grid { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; align-content: start; padding: 14px 2px 8px; margin: 0 -2px; }
+.card-btn { border-radius: var(--radius-card); padding: 12px 10px 13px; display: flex; flex-direction: column; align-items: center; gap: 3px; text-align: center; }
+.card-btn.in-use { border-color: var(--accent); box-shadow: 0 10px 26px var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), 0 0 0 2px var(--accent); }
+.card-btn.locked .preview { opacity: .5; }
+.card-name { font: var(--fw-display) 17px/1.2 var(--font-display); }
+.card-state { font-size: 13px; font-weight: 500; color: var(--text-soft); }
+.preview { --tw: 30px; --bh: 15px; --th: 76px; --lift: 0px; height: 96px; width: 100%; display: grid; place-items: center; padding-top: 10px; }
+.preview.swatch {
+  height: 84px; margin-bottom: 12px; padding: 0; border-radius: 18px; border: 1px solid var(--glass-rim);
+  background:
+    radial-gradient(75% 60% at 8% 6%, var(--blob-1), transparent 72%),
+    radial-gradient(70% 60% at 100% 38%, var(--blob-2), transparent 72%),
+    radial-gradient(90% 65% at 35% 108%, var(--blob-3), transparent 72%),
+    var(--bg-base);
+  background-size: cover; background-position: center;
+}
+.preview.dots { height: 84px; margin-bottom: 12px; padding: 0 8px; grid-template-columns: repeat(6, 1fr); gap: 6px; align-content: center; }
+.preview.dots i { width: 100%; max-width: 22px; aspect-ratio: 1; border-radius: 50%; background: linear-gradient(135deg, var(--gloss-light), transparent 55%), var(--c); box-shadow: 0 2px 4px var(--glass-shadow); }
+.preview .tube { cursor: inherit; }
+.preview .tube.done .cork { transition: none; }
+
+/* --- Pop-ups --- */
+.pop { position: absolute; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; visibility: hidden; opacity: 0; transition: opacity .2s ease, visibility 0s linear .2s; }
+.pop.on { visibility: visible; opacity: 1; transition-delay: 0s; }
+.scrim { position: fixed; inset: 0; background: var(--scrim); }
+.card { position: relative; width: 100%; max-width: 340px; padding: 26px 22px 22px; text-align: center; border-radius: var(--radius-card); background: var(--card-fill); transform: translateY(40px) scale(.93); transition: transform var(--t-popup) var(--spring); }
+.pop.on .card { transform: none; }
+.card h2 { margin: 0 0 8px; font: var(--fw-display) 28px/1.1 var(--font-display); letter-spacing: -.02em; }
+.card p { margin: 0 0 6px; font-size: 16px; }
+.card .note { min-height: 1.3em; font-size: 14px; font-weight: var(--fw-strong); color: var(--ok); }
+.card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.card-row .btn, .card > .btn { padding: 14px 10px; font-size: 16px; }
+.card > .btn { width: 100%; margin-top: 16px; }
+.award-list { list-style: none; margin: 14px 0 0; padding: 0; text-align: left; display: grid; gap: 8px; }
+.award-list li { display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 16px; background: var(--glass-fill); border: 1px solid var(--glass-rim); }
+.award-list .tick { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--tube-outline); color: transparent; }
+.award-list .tick .ico { width: 16px; height: 16px; stroke-width: 3; }
+.award-list li.earned .tick { background: var(--ok); border-color: var(--ok); color: #fff; }
+.award-list li:not(.earned) { opacity: .62; }
+.award-list b { display: block; font: var(--fw-display) 16px/1.2 var(--font-display); }
+.award-list small { font-size: 13px; color: var(--text-soft); }
+
+/* --- Very short screens (a phone held sideways): shrink things so nothing is cut off.
+       Kept at the end of S7 so it wins over the rules above. --- */
+@media (max-height: 520px) {
+  #home { padding-top: max(10px, env(safe-area-inset-top)); }
+  .title { font-size: 40px; }
+  .tagline { margin-top: 2px; font-size: 13px; }
+  .droplet { width: 52px; height: 52px; margin: 10px 0 4px; }
+  .droplet-in { margin-top: 4px; }
+  .droplet-in small { display: none; }
+  .droplet-in b { font-size: 22px; }
+  .play { padding: 10px 28px; font-size: 20px; }
+  .play .ico { width: 20px; height: 20px; }
+  .tile { padding: 6px 0 5px; gap: 2px; }
+  .icon-btn { width: 36px; height: 36px; }
+  .status { height: 26px; margin: 0; font-size: 13px; }
+  .check { padding: 2px 4px; font-size: 13px; }
+  .action { flex-direction: row; justify-content: center; gap: 6px; padding: 8px 4px; }
+  .action .ico { width: 18px; height: 18px; }
+}
+
+/* =======================================================================
+   S8  ANIMATIONS
+   CSS timings live here. The pour sequence timings are in CONFIG (C7).
+   ======================================================================= */
+:root {
+  --spring: cubic-bezier(.34, 1.56, .64, 1);  /* springy overshoot ease */
+  --t-lift: .3s;        /* selected tube lifts / drops */
+  --t-pop: .4s;         /* finished tube pop */
+  --t-cork: .34s;       /* cork drops in */
+  --t-screen: .26s;     /* home / shop / game fade and scale */
+  --t-popup: .45s;      /* pop-up rises in */
+  --t-press: .07s;      /* button shrinks when pressed */
+  --t-press-back: .32s; /* button springs back */
+  --press-scale: .93;   /* pressed button size */
+}
+@keyframes pop { 0% { scale: 1; } 45% { scale: 1.07; } 100% { scale: 1; } }
+@keyframes bob { from { translate: 0 0; } to { translate: 0 -9px; } }
+@keyframes hint-bob { from { translate: 0 0; } to { translate: 0 calc(var(--lift) * -.7); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="bg" aria-hidden="true"></div>
+
+<main id="app">
+
+  <!-- ===================================================================
+       P1  GAME SCREEN
+       Labels are filled in from CONFIG (C1): data-t = text, data-tl = spoken label.
+       =================================================================== -->
+  <section id="game" class="screen" aria-label="Game">
+    <header class="topbar">
+      <button id="btnHome" class="frost btn icon-btn" type="button" data-tl="home">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5M6.5 10v9.5h11V10"/></svg>
+      </button>
+      <div class="levelnav">
+        <button id="btnPrev" class="frost btn nav-btn" type="button" data-tl="prevLevel">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5 8 12l6.5 7"/></svg>
+        </button>
+        <h1 id="levelName" class="level-name"></h1>
+        <button id="btnNext" class="frost btn nav-btn" type="button" data-tl="nextLevelArrow">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 5 16 12l-6.5 7"/></svg>
+        </button>
+      </div>
+      <div id="pours" class="frost pill"></div>
+    </header>
+
+    <div id="board" class="board" role="group" data-tl="boardLabel" data-tube="test"></div>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <p id="sr" class="sr-only" role="status" aria-live="polite"></p>
+
+    <label class="check">
+      <input type="checkbox" id="chkSymbols">
+      <span class="box frost"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
+      <span data-t="symbols"></span>
+    </label>
+
+    <nav class="actions" data-tl="actionsLabel">
+      <button id="btnUndo" class="frost btn action" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 4.5 10.5 9 15M5 10.5h9.5a5 5 0 0 1 0 10H11"/></svg>
+        <span data-t="undo"></span>
+      </button>
+      <button id="btnHint" class="frost btn action" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
+        <span data-t="hint"></span>
+      </button>
+      <button id="btnAdd" class="frost btn action" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h8M6.5 3v14a2.5 2.5 0 0 0 5 0V3M18 11v8M14 15h8"/></svg>
+        <span data-t="addTube"></span>
+      </button>
+      <button id="btnRestart" class="frost btn action" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12a7 7 0 1 0 2.1-5M7.1 3v4h4"/></svg>
+        <span data-t="restart"></span>
+      </button>
+    </nav>
+  </section>
+
+  <!-- ===================================================================
+       P2  HOME SCREEN
+       =================================================================== -->
+  <section id="home" class="screen" aria-label="Home">
+    <div>
+      <h1 id="homeTitle" class="title" data-t="title"></h1>
+      <p class="tagline" data-t="tagline"></p>
+    </div>
+
+    <div id="homeBadge" class="droplet frost">
+      <span class="droplet-in"><small data-t="levelWord"></small><b id="homeLevel"></b></span>
+    </div>
+
+    <button id="btnPlay" class="frost accent btn play" type="button">
+      <svg class="ico solid" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+      <span data-t="play"></span>
+    </button>
+
+    <div id="homeCoinPill" class="frost pill"><span class="coin" aria-hidden="true"></span><span id="homeCoins" aria-hidden="true"></span></div>
+
+    <div class="home-row">
+      <button id="btnSound" class="frost btn tile" type="button">
+        <svg class="ico on-only" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5l4.5 4v-13l-4.5 4zM15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>
+        <svg class="ico off-only" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5l4.5 4v-13l-4.5 4zM16 9.5l5 5M21 9.5l-5 5"/></svg>
+        <span id="lblSound"></span>
+      </button>
+      <button id="btnBuzz" class="frost btn tile" type="button">
+        <svg class="ico on-only" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="4" width="8" height="16" rx="2"/><path d="M4.5 9v6M19.5 9v6M1.5 10.5v3M22.5 10.5v3"/></svg>
+        <svg class="ico off-only" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="4" width="8" height="16" rx="2"/><path d="M4 4l16 16"/></svg>
+        <span id="lblBuzz"></span>
+      </button>
+      <button id="btnTubes" class="frost btn tile" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8M9.5 3v14.5a2.5 2.5 0 0 0 5 0V3M9.5 11h5"/></svg>
+        <span data-t="tubes"></span>
+      </button>
+      <button id="btnThemes" class="frost btn tile" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="m4.5 16.5 4.5-4.5 3.5 3.5 2.5-2.5 4.5 4.5"/><circle cx="15.5" cy="9.5" r="1.2"/></svg>
+        <span data-t="themes"></span>
+      </button>
+      <button id="btnAwards" class="frost btn tile" type="button">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="9" r="5"/><path d="M9 13.5 7.5 21l4.5-2.5 4.5 2.5-1.500-7.500"/></svg>
+        <span data-t="awards"></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ===================================================================
+       P3  SHOP SCREEN
+       =================================================================== -->
+  <section id="shop" class="screen" aria-label="Shop">
+    <header class="topbar">
+      <button id="btnBack" class="frost btn icon-btn" type="button" data-tl="back">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 5 8 12l6.5 7"/></svg>
+      </button>
+      <h1 class="level-name" data-t="shop"></h1>
+      <div id="shopCoinPill" class="frost pill"><span class="coin" aria-hidden="true"></span><span id="shopCoins" aria-hidden="true"></span></div>
+    </header>
+    <div class="tabs frost" role="tablist">
+      <button class="btn tab" type="button" role="tab" data-tab="tubes" data-t="tabTubes"></button>
+      <button class="btn tab" type="button" role="tab" data-tab="backdrops" data-t="tabBackdrops"></button>
+      <button class="btn tab" type="button" role="tab" data-tab="colours" data-t="tabColours"></button>
+    </div>
+    <div id="shopGrid" class="shop-grid" role="tabpanel"></div>
+    <p id="shopMsg" class="status" role="status" aria-live="polite"></p>
+  </section>
+
+  <!-- ===================================================================
+       P4  POP-UPS
+       =================================================================== -->
+  <div id="win" class="pop" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="scrim"></div>
+    <div class="card frost">
+      <h2 id="winTitle"></h2>
+      <p id="winBody"></p>
+      <p id="winAward" class="note"></p>
+      <div class="card-row">
+        <button id="winHome" class="frost btn" type="button" data-t="winHome"></button>
+        <button id="winNext" class="frost accent btn" type="button" data-t="winNext"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="awards" class="pop" role="dialog" aria-modal="true" aria-labelledby="awardsTitle">
+    <div class="scrim" id="awardsScrim"></div>
+    <div class="card frost">
+      <h2 id="awardsTitle" data-t="awardsTitle"></h2>
+      <ul id="awardList" class="award-list"></ul>
+      <button id="awardsClose" class="frost accent btn" type="button" data-t="close"></button>
+    </div>
+  </div>
+</main>
+
+<div id="fx" aria-hidden="true"></div>
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<!-- Colour-blind symbols, one per colour (sym-0 red ... sym-11 slate) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="sym-0" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol>
+  <symbol id="sym-1" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/></symbol>
+  <symbol id="sym-2" viewBox="0 0 24 24"><path d="M12 4 21 20H3z"/></symbol>
+  <symbol id="sym-3" viewBox="0 0 24 24"><path d="M12 3l9 9-9 9-9-9z"/></symbol>
+  <symbol id="sym-4" viewBox="0 0 24 24"><path d="M12 2.500 14.350 8.760 21.030 9.060 15.800 13.240 17.580 19.690 12 16 6.420 19.690 8.200 13.240 2.970 9.060 9.650 8.760z"/></symbol>
+  <symbol id="sym-5" viewBox="0 0 24 24"><path d="M9.500 3h5v6.500H21v5h-6.500V21h-5v-6.500H3v-5h6.500z"/></symbol>
+  <symbol id="sym-6" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 3a9 9 0 1 0 0 18a9 9 0 0 0 0-18zm0 5a4 4 0 1 1 0 8a4 4 0 0 1 0-8z"/></symbol>
+  <symbol id="sym-7" viewBox="0 0 24 24"><path d="M21 12 16.500 19.790H7.500L3 12l4.500-7.790h9z"/></symbol>
+  <symbol id="sym-8" viewBox="0 0 24 24"><path d="M12 20.500C5 15.500 3 12 3 8.800A4.800 4.800 0 0 1 12 6.500a4.800 4.800 0 0 1 9 2.300c0 3.200-2 6.700-9 11.700z"/></symbol>
+  <symbol id="sym-9" viewBox="0 0 24 24"><path d="M4 6h16v4.500H4zM4 13.500h16V18H4z"/></symbol>
+  <symbol id="sym-10" viewBox="0 0 24 24"><path d="M19 14.500A8 8 0 1 1 9.500 5a7 7 0 0 0 9.500 9.500z"/></symbol>
+  <symbol id="sym-11" viewBox="0 0 24 24"><path transform="rotate(45 12 12)" d="M9.500 2h5v7.500H22v5h-7.500V22h-5v-7.500H2v-5h7.500z"/></symbol>
+</svg>
+
+<!-- =====================================================================
+     SETTINGS: everything you are likely to change is in CONFIG
+     ===================================================================== -->
+<script>
+const CONFIG = {
+
+  /* ---------------------------------------------------------------------
+     C1  TEXT - every label and message. {n} style words are filled in.
+     --------------------------------------------------------------------- */
+  text: {
+    title: 'Decant',                      // game title (home screen and browser tab)
+    tagline: 'Water sort puzzle',         // line under the title
+    play: 'Play',                         // big home button
+    levelWord: 'Level',                   // small word in the droplet badge
+    level: 'Level {n}',                   // top bar heading
+    pourOne: '{n} pour',                  // pour counter, exactly one
+    pourMany: '{n} pours',                // pour counter, any other number
+    home: 'Home',                         // spoken label of the home button
+    prevLevel: 'Previous level',          // spoken label of the left arrow
+    nextLevelArrow: 'Next level',         // spoken label of the right arrow
+    boardLabel: 'Tubes',                  // spoken name of the tube area
+    actionsLabel: 'Game actions',         // spoken name of the bottom buttons
+    undo: 'Undo',
+    hint: 'Hint',
+    addTube: 'Add tube',
+    restart: 'Restart',
+    symbols: 'Show symbols on colours',   // checkbox
+    tutorialFirst: 'Tap the tube the hand points at.',
+    tutorialSecond: 'Now tap the other tube to pour.',
+    stuck: 'No pours left. Undo, add a tube, or restart.',
+    hintSay: 'Hint: pour tube {a} into tube {b}.',
+    hintNone: 'No solution from here. Undo a few pours.',
+    hintUnsure: 'No solution found from here. Try undoing a few pours.', // solver gave up before checking everything
+    undone: 'Pour undone.',
+    tubeAdded: 'Extra tube added.',
+    restarted: 'Level restarted.',
+    levelDone: 'Level cleared. Restart to play it again.',   // shown on a level you have already cleared
+    tubeIsDone: 'That tube is finished.',
+    tubeIsEmpty: 'That tube is empty.',
+    winTitle: 'Level {n} cleared',
+    winBody: 'Sorted in {pours}. +{coins} coins.',   // first time a level is cleared
+    winBodyReplay: 'Sorted in {pours}.',             // replaying an old level
+    winHome: 'Home',
+    winNext: 'Next level',
+    awardEarned: 'Award earned: {name}',
+    soundOn: 'Sound on', soundOff: 'Sound off',
+    buzzOn: 'Buzz on', buzzOff: 'Buzz off',
+    tubes: 'Tubes', themes: 'Themes', awards: 'Awards',   // home row
+    coinsSpoken: '{n} coins',             // spoken coin count
+    shop: 'Shop',
+    back: 'Back',
+    tabTubes: 'Tubes', tabBackdrops: 'Backdrops', tabColours: 'Colours',
+    inUse: 'In use',
+    tapToUse: 'Tap to use',
+    reachLevel: 'Reach level {n}',
+    price: '{n} coins',
+    needCoins: 'You need {n} more coins.',
+    needLevel: 'Reach level {n} to unlock {name}.',
+    bought: 'Bought {name}.',
+    nowUsing: 'Now using {name}.',
+    awardsTitle: 'Awards',
+    close: 'Close',
+    earned: 'earned',                     // spoken after an earned award
+    notEarned: 'not earned yet',          // spoken after a locked award
+    tubeEmpty: 'Tube {i}, empty',                      // spoken tube labels
+    tubeDone: 'Tube {i}, finished, all {c}',
+    tubeMixed: 'Tube {i}, from the top: {list}',
+    srPoured: 'Poured {n} {c} into tube {b}.',         // spoken after a pour
+    colourNames: ['red', 'orange', 'yellow', 'green', 'teal', 'sky', 'blue', 'violet', 'pink', 'brown', 'lime', 'slate']
+  },
+
+  /* ---------------------------------------------------------------------
+     C2  IMAGES - optional. Give a path or URL to use your own picture;
+     leave "" to keep the built-in drawing.
+     --------------------------------------------------------------------- */
+  images: {
+    logo: '',        // replaces the "Decant" title text on the home screen
+    homeBadge: '',   // replaces the droplet behind the level number
+    hand: '',        // replaces the tutorial pointing hand
+    coin: '',        // replaces the gold coin
+    background: ''   // picture over the colour wash (a backdrop's own image wins)
+  },
+
+  /* ---------------------------------------------------------------------
+     C3  LEVELS
+     --------------------------------------------------------------------- */
+  levels: {
+    capacity: 4,                  // bands a tube holds
+    tutorialLevel: 1,             // which level is the tutorial
+    tutorial: [[2], [2, 2, 2]],   // tutorial tubes, bottom to top (2 = yellow)
+    tutorialFirstTube: 0,         // tube the hand points at first
+    fixedLevels: {                // hand-set levels: colours and empty tubes
+      2: { colours: 2, empty: 1 }
+    },
+    listStart: 3,                 // level that uses the first entry of coloursPerLevel
+    coloursPerLevel: [3, 3, 4, 5, 5, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11],
+    coloursAfter: 12,             // colours once the list above runs out
+    emptyTubes: 2,                // empty tubes on listed and later levels
+    extraTubes: 1,                // "Add tube" uses per level
+    coinsPerLevel: 20,            // coins for clearing a level the first time
+    rejectTopRun: 3,              // throw away deals with this many matching bands on top
+    seed: 20240917,               // change to get a different set of puzzles
+    maxAttempts: 400,             // seeds tried per level before giving up
+    solverNodes: 40000,           // positions the solver may visit when checking a new level
+    hintNodes: 150000             // positions the solver may visit for a hint
+  },
+
+  /* ---------------------------------------------------------------------
+     C4  SHOP - ids match the CSS blocks (tubes S6, backdrops S3, colours S2)
+     --------------------------------------------------------------------- */
+  shop: {
+    tubes: [                                   // unlocked by level reached
+      { id: 'test',   name: 'Test tube', level: 1 },
+      { id: 'vial',   name: 'Vial',      level: 5 },
+      { id: 'beaker', name: 'Beaker',    level: 10 },
+      { id: 'bulb',   name: 'Bulb',      level: 20 },
+      { id: 'glow',   name: 'Glow',      level: 30 },
+      { id: 'gilded', name: 'Gilded',    level: 50 }
+    ],
+    defaultBackdrop: 'peach',                  // backdrop a new player starts with (keep its price at 0)
+    backdrops: [                               // bought with coins (price 0 = free); image is optional
+      { id: 'peach',    name: 'Peach',    price: 0,   image: '' },
+      { id: 'aurora',   name: 'Aurora',   price: 0,   image: '' },
+      { id: 'midnight', name: 'Midnight', price: 100, image: '' },
+      { id: 'forest',   name: 'Forest',   price: 150, image: '' },
+      { id: 'ocean',    name: 'Ocean',    price: 200, image: '' }
+    ],
+    colourSets: [                              // bought with coins
+      { id: 'classic', name: 'Classic', price: 0 },
+      { id: 'pastel',  name: 'Pastel',  price: 150 },
+      { id: 'neon',    name: 'Neon',    price: 150 }
+    ],
+    colourCount: 12                            // colours in every set (liq-0 to liq-11)
+  },
+
+  /* ---------------------------------------------------------------------
+     C5  AWARDS - type 'clear' = clear that level; 'buy' = buy that many shop items
+     --------------------------------------------------------------------- */
+  awards: [
+    { id: 'first',     name: 'First pour',      how: 'Clear level 1',     type: 'clear', value: 1 },
+    { id: 'warm',      name: 'Warming up',      how: 'Clear level 5',     type: 'clear', value: 5 },
+    { id: 'steady',    name: 'Steady hand',     how: 'Clear level 10',    type: 'clear', value: 10 },
+    { id: 'chemist',   name: 'Chemist',         how: 'Clear level 25',    type: 'clear', value: 25 },
+    { id: 'master',    name: 'Master decanter', how: 'Clear level 50',    type: 'clear', value: 50 },
+    { id: 'collector', name: 'Collector',       how: 'Buy 3 shop items',  type: 'buy',   value: 3 }
+  ],
+
+  /* ---------------------------------------------------------------------
+     C6  SOUND AND VIBRATION - pitches in hertz, times in milliseconds
+     --------------------------------------------------------------------- */
+  sound: {
+    volume: 0.22,            // overall loudness, 0 to 1
+    select: 720,             // tick when a tube is selected
+    selectMs: 60,
+    pourFrom: 300,           // pour glide starts here...
+    pourTo: 640,             // ...and rises to here
+    cork: 105,               // low thud when a tube is corked
+    corkMs: 170,
+    win: [523, 659, 784],    // three rising notes on a win
+    winNoteMs: 230,          // length of each win note
+    winGapMs: 130,           // gap between win notes
+    buzzSelect: 8,           // vibration on select
+    buzzCork: 25,            // vibration when a tube is corked
+    buzzWin: [30, 50, 30, 50, 70] // vibration pattern on a win
+  },
+
+  /* ---------------------------------------------------------------------
+     C7  ANIMATION TIMINGS - the pour sequence, in milliseconds
+     (lift, pop, cork and screen fades are CSS timings in S8)
+     --------------------------------------------------------------------- */
+  anim: {
+    travel: 300,        // source tube flies to just above the target
+    tiltAngle: 65,      // degrees the source tube tilts
+    tilt: 240,          // time the tilt takes
+    tiltDelay: 150,     // tilt starts this long after the tube sets off
+    hover: 0.3,         // gap between pouring lip and target mouth, in tube widths
+    streamIn: 110,      // stream falls into the target
+    pourBase: 200,      // pour time: base...
+    pourPerBand: 80,    // ...plus this for every band moved
+    streamOut: 110,     // stream retracts
+    back: 280,          // source tube returns
+    streamWidth: 0.1,   // stream thickness, in tube widths
+    winDelay: 550,      // wait before the win pop-up
+    queueMax: 2,        // taps remembered during a pour
+
+    /* Confetti (skipped when the device asks for reduced motion) */
+    confettiTube: 34,        // pieces thrown when one tube is finished (0 = none)
+    confettiWin: 220,        // pieces in the big shower when the level is cleared (0 = none)
+    confettiSize: 10,        // largest piece, in pixels
+    confettiTubeSpeed: 620,  // how hard a tube burst is thrown (pixels per second)
+    confettiWinSpeed: 1350,  // how hard the two side cannons fire on a win
+    confettiGravity: 1000,   // how fast pieces fall
+    confettiDrag: 1.9,       // air resistance (higher = floatier)
+    confettiTubeLife: 1500,  // how long a tube burst lasts, in milliseconds
+    confettiWinLife: 3400,   // how long the win shower lasts, in milliseconds
+    confettiMax: 600         // most pieces on screen at once
+  },
+
+  /* ---------------------------------------------------------------------
+     C8  LAYOUT NUMBERS - used to size the tubes so the board always fits.
+     Ratios are in tube widths.
+     --------------------------------------------------------------------- */
+  layout: {
+    rowMax: 5,           // most tubes in a single row; more than this makes two rows
+    tubeMaxWidth: 58,    // widest a tube gets, in pixels
+    tubeMinWidth: 16,    // narrowest a tube gets, in pixels
+    tubeFill: 0.76,      // share of each column the tube takes
+    bandRatio: 0.8,      // band height (smallest)
+    bandRatioMax: 1.05,  // bands stretch up to this when there is spare height
+    tubeMaxHeight: 0.6,  // tallest a tube gets, as a share of the board width
+    headroom: 0.45,      // empty space above a full tube
+    lift: 0.42,          // how far a selected tube lifts
+    rowGap: 0.35,        // gap between the two rows
+    gapMax: 0.6,         // widest gap between tubes
+    shelfSpace: 12       // pixels under each row for the shelf
+  },
+
+  saveKey: 'decant-save-v1'  // localStorage key (change it to start everyone fresh)
+};
+</script>
+
+<!-- =====================================================================
+     ENGINE: puzzle rules, level generator and solver. No screen code.
+     Tubes are arrays of colour numbers, bottom first, top last.
+     ===================================================================== -->
+<script>
+const Engine = (function () {
+  'use strict';
+
+  /* Seeded random numbers: the same seed always gives the same sequence. */
+  function makeRandom(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function shuffle(list, random) {
+    for (let i = list.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      const tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+    }
+    return list;
+  }
+
+  /* ----- Rules (work on arrays and on the solver's strings alike) ----- */
+
+  /* How many matching bands sit on top of a tube. */
+  function topRun(tube) {
+    const len = tube.length;
+    if (!len) return 0;
+    const top = tube[len - 1];
+    let n = 1;
+    while (n < len && tube[len - 1 - n] === top) n++;
+    return n;
+  }
+  function isFinished(tube, cap) { return tube.length === cap && topRun(tube) === cap; }
+  function isCleared(board, cap) {
+    for (let i = 0; i < board.length; i++) {
+      if (board[i].length && !isFinished(board[i], cap)) return false;
+    }
+    return true;
+  }
+  function canPour(board, from, to, cap) {
+    if (from === to) return false;
+    const s = board[from], d = board[to];
+    if (!s || !d || !s.length || isFinished(s, cap)) return false;
+    if (d.length >= cap) return false;
+    return !d.length || d[d.length - 1] === s[s.length - 1];
+  }
+  /* Pour in place; returns how many bands moved. */
+  function pour(board, from, to, cap) {
+    if (!canPour(board, from, to, cap)) return 0;
+    const s = board[from], d = board[to];
+    const n = Math.min(topRun(s), cap - d.length);
+    for (let i = 0; i < n; i++) d.push(s.pop());
+    return n;
+  }
+  function unpour(board, from, to, n) {
+    for (let i = 0; i < n; i++) board[from].push(board[to].pop());
+  }
+
+  /* Every pour worth trying, best first. Leaves out pours that change nothing
+     (a single-colour tube into an empty tube, or a second empty tube). */
+  function listMoves(board, cap) {
+    const out = [];
+    const count = board.length;
+    let firstEmpty = -1;
+    for (let i = 0; i < count; i++) if (!board[i].length) { firstEmpty = i; break; }
+    for (let a = 0; a < count; a++) {
+      const s = board[a];
+      if (!s.length) continue;
+      const run = topRun(s);
+      if (run === cap) continue;                       // finished
+      const uniform = run === s.length;
+      const top = s[s.length - 1];
+      for (let b = 0; b < count; b++) {
+        if (a === b) continue;
+        const d = board[b];
+        if (!d.length) {
+          if (b === firstEmpty && !uniform) out.push([a, b, 1]);
+          continue;
+        }
+        if (d.length >= cap || d[d.length - 1] !== top) continue;
+        const room = cap - d.length;
+        let score = 0;                                 // partial pours last
+        if (run <= room) {
+          score = 10 + d.length + run;
+          if (uniform) score += 5;                     // empties a tube
+          if (d.length + run === cap && topRun(d) === d.length) score += 20; // finishes a tube
+        }
+        out.push([a, b, score]);
+      }
+    }
+    out.sort(function (x, y) { return y[2] - x[2]; });
+    return out;
+  }
+  function hasMoves(board, cap) { return listMoves(board, cap).length > 0; }
+
+  /* ----- Solver: depth-first search with a visited set and a node limit ----- */
+  function keyOf(state) { return state.slice().sort().join('|'); }
+  function pourString(state, from, to, cap) {
+    const s = state[from], d = state[to];
+    const n = Math.min(topRun(s), cap - d.length);
+    const next = state.slice();
+    next[from] = s.slice(0, s.length - n);
+    next[to] = d + s.slice(s.length - n);
+    return next;
+  }
+  /* Returns { solved, moves: [[from, to], ...], nodes, exhausted }.
+     exhausted = true means every position was checked and none works. */
+  function solve(board, cap, nodeLimit) {
+    const start = board.map(function (t) {
+      return t.map(function (c) { return String.fromCharCode(65 + c); }).join('');
+    });
+    if (isCleared(start, cap)) return { solved: true, moves: [], nodes: 0, exhausted: false };
+    const seen = new Set([keyOf(start)]);
+    const stack = [{ state: start, moves: listMoves(start, cap), next: 0 }];
+    const path = [];
+    let nodes = 1;
+    while (stack.length) {
+      const frame = stack[stack.length - 1];
+      if (frame.next >= frame.moves.length) { stack.pop(); path.pop(); continue; }
+      const m = frame.moves[frame.next++];
+      const state = pourString(frame.state, m[0], m[1], cap);
+      const key = keyOf(state);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      path.push([m[0], m[1]]);
+      if (isCleared(state, cap)) return { solved: true, moves: path, nodes: nodes, exhausted: false };
+      if (++nodes > nodeLimit) return { solved: false, moves: [], nodes: nodes, exhausted: false };
+      stack.push({ state: state, moves: listMoves(state, cap), next: 0 });
+    }
+    return { solved: false, moves: [], nodes: nodes, exhausted: true };
+  }
+
+  /* ----- Levels ----- */
+
+  /* What a level number is made of, read from the levels settings. */
+  function levelSpec(n, L) {
+    if (n === L.tutorialLevel) return { tutorial: L.tutorial };
+    if (L.fixedLevels && L.fixedLevels[n]) return L.fixedLevels[n];
+    const i = Math.max(0, n - L.listStart);
+    const list = L.coloursPerLevel;
+    return { colours: i < list.length ? list[i] : L.coloursAfter, empty: L.emptyTubes };
+  }
+  function isTutorial(n, L) { return n === L.tutorialLevel; }
+
+  /* Build the puzzle for a level number. The same number always gives the same
+     puzzle: seeds are tried in order until one is solvable. */
+  function makeLevel(n, L, paletteSize) {
+    const spec = levelSpec(n, L);
+    if (spec.tutorial) return spec.tutorial.map(function (t) { return t.slice(); });
+    const cap = L.capacity;
+    const colours = Math.min(spec.colours, paletteSize);
+    let board = null;
+    for (let attempt = 0; attempt < L.maxAttempts; attempt++) {
+      const random = makeRandom(L.seed + n * 1000003 + attempt * 7919);
+      const palette = [];
+      for (let c = 0; c < paletteSize; c++) palette.push(c);
+      shuffle(palette, random);
+      const bands = [];
+      for (let c = 0; c < colours; c++) for (let k = 0; k < cap; k++) bands.push(palette[c]);
+      shuffle(bands, random);
+      board = [];
+      for (let t = 0; t < colours; t++) board.push(bands.slice(t * cap, (t + 1) * cap));
+      for (let e = 0; e < spec.empty; e++) board.push([]);
+      if (board.some(function (t) { return topRun(t) >= L.rejectTopRun; })) continue;
+      if (solve(board, cap, L.solverNodes).solved) return board;
+    }
+    return board;   // only reached if every seed failed
+  }
+
+  /* The finished position of a board (every colour sorted into its own tube),
+     used to show a level that has already been cleared. */
+  function finishedBoard(board, cap, nodeLimit) {
+    const out = board.map(function (t) { return t.slice(); });
+    const result = solve(out, cap, nodeLimit);
+    if (result.solved) {
+      result.moves.forEach(function (m) { pour(out, m[0], m[1], cap); });
+      return out;
+    }
+    const colours = [];                                  // fallback: one colour per tube, in order
+    board.forEach(function (t) { t.forEach(function (c) { if (colours.indexOf(c) < 0) colours.push(c); }); });
+    return board.map(function (t, i) {
+      const tube = [];
+      if (i < colours.length) for (let k = 0; k < cap; k++) tube.push(colours[i]);
+      return tube;
+    });
+  }
+
+  return {
+    finishedBoard: finishedBoard,
+    topRun: topRun, isFinished: isFinished, isCleared: isCleared,
+    canPour: canPour, pour: pour, unpour: unpour,
+    listMoves: listMoves, hasMoves: hasMoves, solve: solve,
+    levelSpec: levelSpec, isTutorial: isTutorial, makeLevel: makeLevel
+  };
+})();
+</script>
+
+<!-- =====================================================================
+     SCREENS: drawing, touch, sound, saving, shop and awards
+     ===================================================================== -->
+<script>
+(function () {
+  'use strict';
+
+  const T = CONFIG.text, L = CONFIG.levels, SHOP = CONFIG.shop, A = CONFIG.anim;
+  const G = CONFIG.layout, SND = CONFIG.sound, IMG = CONFIG.images;
+  const CAP = L.capacity;
+
+  const $ = function (id) { return document.getElementById(id); };
+  const root = document.documentElement;
+  const appEl = $('app'), boardEl = $('board'), fxEl = $('fx');
+  const statusEl = $('status'), srEl = $('sr');
+  const screens = { game: $('game'), home: $('home'), shop: $('shop') };
+  const winEl = $('win'), awardsEl = $('awards');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  /* ---------- small helpers ---------- */
+  function fmt(text, vars) {
+    return String(text).replace(/\{(\w+)\}/g, function (m, k) { return vars && k in vars ? vars[k] : m; });
+  }
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function sleep(ms) { return new Promise(function (done) { setTimeout(done, ms); }); }
+  function poursText(n) { return fmt(n === 1 ? T.pourOne : T.pourMany, { n: n }); }
+  function motionOff() { return reduceMotion.matches; }
+  function find(list, id) { for (let i = 0; i < list.length; i++) if (list[i].id === id) return list[i]; return null; }
+
+  /* ---------- saved state ---------- */
+  function startBackdrop() {
+    return find(SHOP.backdrops, SHOP.defaultBackdrop) ? SHOP.defaultBackdrop : SHOP.backdrops[0].id;
+  }
+  let S = freshState();
+  function freshState() {
+    return {
+      launched: false,                 // has the game been opened before
+      level: 1,                        // level being played
+      cleared: 0,                      // highest level cleared (highest reached = cleared + 1)
+      board: null,                     // current tubes
+      pours: 0,                        // pour counter
+      history: [],                     // undo list: [from, to, bands]
+      extra: 0,                        // extra tubes added this level
+      won: false,                      // current board was just cleared (win pop-up)
+      done: false,                     // looking at a level cleared earlier (shown finished, not played)
+      stash: null,                     // an unfinished level set aside while looking at cleared ones
+      coins: 0,
+      bought: [],                      // shop items paid for, e.g. "backdrops:forest"
+      tube: SHOP.tubes[0].id,
+      backdrop: startBackdrop(),
+      backdropPicked: false,           // true once the player has chosen a backdrop in the shop
+      colours: SHOP.colourSets[0].id,
+      sound: true, buzz: true, symbols: false
+    };
+  }
+  function save() {
+    try { localStorage.setItem(CONFIG.saveKey, JSON.stringify(S)); } catch (e) { /* storage blocked or full */ }
+  }
+  function validBoard(b) {
+    if (!Array.isArray(b) || b.length < 2) return false;
+    return b.every(function (t) {
+      return Array.isArray(t) && t.length <= CAP && t.every(function (c) {
+        return Number.isInteger(c) && c >= 0 && c < SHOP.colourCount;
+      });
+    });
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(CONFIG.saveKey);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== 'object') return;
+      const d = Object.assign(freshState(), data);
+      d.cleared = Math.max(0, Math.floor(+d.cleared || 0));
+      d.level = Math.min(Math.max(1, Math.floor(+d.level || 1)), d.cleared + 1);
+      d.coins = Math.max(0, Math.floor(+d.coins || 0));
+      d.pours = Math.max(0, Math.floor(+d.pours || 0));
+      d.extra = Math.max(0, Math.floor(+d.extra || 0));
+      if (!Array.isArray(d.bought)) d.bought = [];
+      if (!Array.isArray(d.history)) d.history = [];
+      if (!validBoard(d.board)) { d.board = null; d.history = []; d.pours = 0; d.extra = 0; d.won = false; d.done = false; }
+      if (!d.stash || typeof d.stash !== 'object' || !validBoard(d.stash.board) || !Array.isArray(d.stash.history)) d.stash = null;
+      if (!find(SHOP.tubes, d.tube)) d.tube = SHOP.tubes[0].id;
+      if (!find(SHOP.backdrops, d.backdrop)) d.backdrop = startBackdrop();
+      /* A player who has never chosen or bought a backdrop follows the default, even if it changes */
+      const boughtBackdrop = d.bought.some(function (b) { return String(b).indexOf('backdrops:') === 0; });
+      if (!d.backdropPicked && !boughtBackdrop) d.backdrop = startBackdrop();
+      if (!find(SHOP.colourSets, d.colours)) d.colours = SHOP.colourSets[0].id;
+      S = d;
+    } catch (e) { /* unreadable save: start fresh */ }
+  }
+
+  /* ---------- sound and vibration ---------- */
+  const Sound = {
+    ctx: null,
+    get: function () {
+      if (!S.sound) return null;
+      try {
+        if (!this.ctx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return null;
+          this.ctx = new AC();
+        }
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        return this.ctx;
+      } catch (e) { return null; }
+    },
+    /* One tone gliding from one pitch to another. hold = keep it loud until the end. */
+    tone: function (from, to, ms, type, gain, delayMs, hold) {
+      const c = this.get();
+      if (!c) return;
+      try {
+        const t0 = c.currentTime + (delayMs || 0) / 1000, t1 = t0 + ms / 1000;
+        const osc = c.createOscillator(), amp = c.createGain();
+        const v = Math.max(0.0002, SND.volume * gain);
+        osc.type = type;
+        osc.frequency.setValueAtTime(from, t0);
+        if (to !== from) osc.frequency.exponentialRampToValueAtTime(to, t1);
+        amp.gain.setValueAtTime(0.0001, t0);
+        amp.gain.exponentialRampToValueAtTime(v, t0 + 0.012);
+        if (hold) amp.gain.setValueAtTime(v, Math.max(t0 + 0.013, t1 - 0.06));
+        amp.gain.exponentialRampToValueAtTime(0.0001, t1);
+        osc.connect(amp); amp.connect(c.destination);
+        osc.start(t0); osc.stop(t1 + 0.03);
+      } catch (e) { /* audio not available */ }
+    },
+    select: function () { this.tone(SND.select, SND.select, SND.selectMs, 'triangle', 0.8); },
+    pour: function (ms) { this.tone(SND.pourFrom, SND.pourTo, ms, 'sine', 0.55, 0, true); },
+    cork: function () { this.tone(SND.cork, SND.cork * 0.55, SND.corkMs, 'sine', 1.6); },
+    win: function () {
+      for (let i = 0; i < SND.win.length; i++) this.tone(SND.win[i], SND.win[i], SND.winNoteMs, 'triangle', 1, i * SND.winGapMs);
+    }
+  };
+  function buzz(pattern) {
+    if (!S.buzz || !navigator.vibrate) return;
+    try { navigator.vibrate(pattern); } catch (e) { /* not allowed */ }
+  }
+
+  /* ---------- confetti ---------- */
+  const confettiEl = $('confetti');
+  function cssColour(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
+  const Confetti = {
+    ctx: null, bits: [], raf: 0, last: 0, w: 0, h: 0,
+    fit: function () {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      this.w = window.innerWidth; this.h = window.innerHeight;
+      confettiEl.width = Math.round(this.w * dpr);
+      confettiEl.height = Math.round(this.h * dpr);
+      this.ctx = confettiEl.getContext('2d');
+      if (this.ctx) this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    },
+    /* Throw a number of pieces from (x, y). angle: middle direction in degrees (-90 = straight up),
+       spread: width of the fan in degrees, speed: pixels per second. */
+    burst: function (x, y, count, colours, angle, spread, speed, lifeMs) {
+      if (motionOff() || count <= 0 || !colours.length) return;
+      if (!this.ctx || this.w !== window.innerWidth || this.h !== window.innerHeight) this.fit();
+      if (!this.ctx) return;
+      for (let i = 0; i < count && this.bits.length < A.confettiMax; i++) {
+        const a = (angle + (Math.random() - 0.5) * spread) * Math.PI / 180;
+        const v = speed * (0.4 + Math.random() * 0.8);
+        this.bits.push({
+          x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+          size: A.confettiSize * (0.5 + Math.random() * 0.5),
+          round: Math.random() < 0.22,
+          rot: Math.random() * 6.28, spin: (Math.random() - 0.5) * 14,
+          flip: Math.random() * 6.28, flipSpeed: 5 + Math.random() * 9,
+          colour: colours[Math.floor(Math.random() * colours.length)],
+          age: 0, life: lifeMs / 1000 * (0.65 + Math.random() * 0.5)
+        });
+      }
+      if (!this.raf) { this.last = performance.now(); this.raf = requestAnimationFrame(confettiStep); }
+    }
+  };
+  function confettiStep(now) {
+    const C = Confetti, ctx = C.ctx;
+    const dt = Math.min(0.034, Math.max(0.001, (now - C.last) / 1000));
+    C.last = now;
+    const keep = Math.exp(-A.confettiDrag * dt);
+    ctx.clearRect(0, 0, C.w, C.h);
+    for (let i = C.bits.length - 1; i >= 0; i--) {
+      const b = C.bits[i];
+      b.age += dt;
+      if (b.age >= b.life || b.y > C.h + 30) { C.bits.splice(i, 1); continue; }
+      b.vy += A.confettiGravity * dt;
+      b.vx *= keep; b.vy *= keep;
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      b.rot += b.spin * dt; b.flip += b.flipSpeed * dt;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, (b.life - b.age) / 0.35);   // fade out at the end
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.rot);
+      ctx.scale(1, Math.cos(b.flip));                           // flutter
+      ctx.fillStyle = b.colour;
+      if (b.round) { ctx.beginPath(); ctx.arc(0, 0, b.size * 0.42, 0, 6.2832); ctx.fill(); }
+      else ctx.fillRect(-b.size / 2, -b.size * 0.3, b.size, b.size * 0.6);
+      ctx.restore();
+    }
+    if (C.bits.length) C.raf = requestAnimationFrame(confettiStep);
+    else { C.raf = 0; ctx.clearRect(0, 0, C.w, C.h); }
+  }
+  /* Small burst out of the mouth of a tube that was just finished, in its own colour. */
+  function tubeConfetti(i) {
+    const t = tubes[i];
+    if (!t || !S.board[i].length) return;
+    const r = t.slot.getBoundingClientRect();
+    const own = cssColour('--liq-' + S.board[i][0]);
+    const colours = [own, own, own, cssColour('--confetti-light'), cssColour('--gold-light')];
+    Confetti.burst(r.left + r.width / 2, r.top, A.confettiTube, colours, -90, 120, A.confettiTubeSpeed, A.confettiTubeLife);
+  }
+  /* Big shower when every tube is finished: two side cannons, then a fall from the top. */
+  function megaConfetti() {
+    const r = appEl.getBoundingClientRect(), n = A.confettiWin;
+    const colours = [cssColour('--confetti-light'), cssColour('--gold-light')];
+    for (let c = 0; c < SHOP.colourCount; c++) colours.push(cssColour('--liq-' + c));
+    const y = r.top + r.height * 0.72;
+    Confetti.burst(r.left, y, Math.round(n * 0.3), colours, -60, 44, A.confettiWinSpeed, A.confettiWinLife);
+    Confetti.burst(r.right, y, Math.round(n * 0.3), colours, -120, 44, A.confettiWinSpeed, A.confettiWinLife);
+    const columns = 8, each = Math.round(n * 0.4 / columns);
+    setTimeout(function () {
+      for (let k = 0; k < columns; k++) {
+        Confetti.burst(r.left + r.width * (k + 0.5) / columns, r.top - 12, each, colours, 90, 150, 240, A.confettiWinLife);
+      }
+    }, 260);
+  }
+
+  /* ---------- game state that is not saved ---------- */
+  let tubes = [];          // [{ el, slot, liq }] one per tube on screen
+  let geom = { tw: 40, bh: 32, th: 150, per: 1 };
+  let sel = null;          // selected tube index
+  let hint = null;         // [from, to] marked by Hint
+  let plan = null;         // solver's remaining moves, so repeated hints follow one solution
+  let statusMsg = '';      // one-off message under the tubes
+  let stuck = false;       // no useful pour left
+  let busy = false;        // a pour animation is running
+  let filling = -1;        // tube being filled by the running animation
+  let animToken = 0;       // changes whenever an animation is cancelled
+  let queue = [];          // taps made during a pour
+  let winInfo = { first: false, awards: [] };
+  let currentScreen = 'game';
+  let shopTab = 'tubes';
+  let lastPointerDown = 0;
+  let handEl = null;
+
+  function isTut() { return Engine.isTutorial(S.level, L); }
+  function reached() { return S.cleared + 1; }
+
+  /* =====================================================================
+     Drawing the board
+     ===================================================================== */
+  function makeBand(c) {
+    const b = el('span', 'band');
+    b.dataset.c = c;
+    b.style.setProperty('--c', 'var(--liq-' + c + ')');
+    b.innerHTML = '<svg class="sym" aria-hidden="true"><use href="#sym-' + c + '"/></svg>';
+    return b;
+  }
+  /* Make the band elements of one tube match the board. */
+  function syncBands(i) {
+    const liq = tubes[i].liq, t = S.board[i];
+    for (let k = 0; k < t.length; k++) {
+      const have = liq.children[k];
+      if (have && +have.dataset.c !== t[k]) { while (liq.children.length > k) liq.lastChild.remove(); }
+      if (!liq.children[k]) liq.appendChild(makeBand(t[k]));
+    }
+    while (liq.children.length > t.length) liq.lastChild.remove();
+  }
+  function resetBands(i) { tubes[i].liq.textContent = ''; syncBands(i); }
+
+  function buildBoard() {
+    boardEl.textContent = '';
+    tubes = [];
+    const n = S.board.length;
+    const rows = n > G.rowMax ? 2 : 1, per = Math.ceil(n / rows);
+    let row = null;
+    for (let i = 0; i < n; i++) {
+      if (i % per === 0) { row = el('div', 'row'); boardEl.appendChild(row); }
+      const slot = el('div', 'slot');
+      const btn = el('button', 'tube');
+      btn.type = 'button';
+      btn.dataset.i = i;
+      const glass = el('span', 'glass'), liq = el('span', 'liquid');
+      glass.appendChild(liq);
+      glass.appendChild(el('span', 'shine'));
+      btn.appendChild(el('span', 'cork'));
+      btn.appendChild(glass);
+      slot.appendChild(btn);
+      row.appendChild(slot);
+      tubes.push({ el: btn, slot: slot, liq: liq });
+      syncBands(i);
+    }
+    geom.per = per;
+    layout();
+  }
+
+  /* Work out tube size from the space available so nothing scrolls. */
+  function layout() {
+    if (!S.board) return;
+    const n = S.board.length;
+    const rows = n > G.rowMax ? 2 : 1, per = Math.ceil(n / rows);
+    const W = boardEl.clientWidth, H = boardEl.clientHeight;
+    if (!W || !H) return;
+    const unitsPerRow = CAP * G.bandRatio + G.headroom + G.lift;
+    const need = function (tw) { return rows * (tw * unitsPerRow + G.shelfSpace) + (rows - 1) * tw * G.rowGap; };
+    let tw = Math.min(G.tubeMaxWidth, (W / per) * G.tubeFill);
+    if (need(tw) > H) tw = (H - rows * G.shelfSpace) / (rows * unitsPerRow + (rows - 1) * G.rowGap);
+    tw = Math.max(G.tubeMinWidth, Math.floor(tw));
+    /* stretch the bands when there is height to spare, without making tubes too tall to tilt on screen */
+    const fitH = ((H - rows * G.shelfSpace - (rows - 1) * tw * G.rowGap) / (rows * tw) - G.headroom - G.lift) / CAP;
+    const fitW = (W * G.tubeMaxHeight / tw - G.headroom) / CAP;
+    const ratio = Math.max(G.bandRatio, Math.min(G.bandRatioMax, fitH, fitW));
+    const bh = Math.max(4, Math.floor(tw * ratio));
+    const th = CAP * bh + Math.round(tw * G.headroom);
+    const gap = Math.max(3, Math.floor(Math.min(tw * G.gapMax, (W - per * tw) / per)));
+    const st = boardEl.style;
+    st.setProperty('--tw', tw + 'px');
+    st.setProperty('--bh', bh + 'px');
+    st.setProperty('--th', th + 'px');
+    st.setProperty('--lift', Math.round(tw * G.lift) + 'px');
+    st.setProperty('--gap', gap + 'px');
+    st.setProperty('--row-gap', Math.round(tw * G.rowGap) + 'px');
+    st.setProperty('--shelf-space', G.shelfSpace + 'px');
+    geom.tw = tw; geom.bh = bh; geom.th = th; geom.per = per;
+  }
+
+  function tubeLabel(i) {
+    const t = S.board[i], names = T.colourNames;
+    if (!t.length) return fmt(T.tubeEmpty, { i: i + 1 });
+    if (Engine.isFinished(t, CAP)) return fmt(T.tubeDone, { i: i + 1, c: names[t[0]] });
+    return fmt(T.tubeMixed, { i: i + 1, list: t.slice().reverse().map(function (c) { return names[c]; }).join(', ') });
+  }
+  /* Update one tube's classes and spoken label in place (no rebuilding). */
+  function paintTube(i) {
+    const t = tubes[i];
+    if (!t) return;
+    const done = i !== filling && Engine.isFinished(S.board[i], CAP);
+    t.el.classList.toggle('sel', sel === i);
+    t.el.classList.toggle('done', done);
+    t.el.classList.toggle('hint-from', !!hint && hint[0] === i);
+    t.el.classList.toggle('hint-to', !!hint && hint[1] === i);
+    t.el.setAttribute('aria-label', tubeLabel(i));
+    t.el.setAttribute('aria-pressed', sel === i ? 'true' : 'false');
+    if (done) t.el.setAttribute('aria-disabled', 'true'); else t.el.removeAttribute('aria-disabled');
+  }
+  function paintAll() { for (let i = 0; i < tubes.length; i++) paintTube(i); }
+
+  function paintHud() {
+    $('levelName').textContent = fmt(T.level, { n: S.level });
+    $('pours').textContent = poursText(S.pours);
+    $('btnPrev').disabled = S.level <= 1;
+    $('btnNext').disabled = S.level >= reached();
+    const tut = isTut();
+    const over = S.won || S.done;
+    $('btnUndo').disabled = over || !S.history.length;
+    $('btnHint').disabled = over || tut;
+    $('btnAdd').disabled = over || tut || S.extra >= L.extraTubes;
+  }
+  function paintStatus() {
+    let msg = statusMsg;
+    if (S.done) msg = msg || T.levelDone;
+    else if (isTut() && !S.won) msg = sel === null ? T.tutorialFirst : T.tutorialSecond;
+    else if (!msg && stuck && !S.won) msg = T.stuck;
+    if (statusEl.textContent !== msg) statusEl.textContent = msg;
+  }
+  function announce(msg) { srEl.textContent = msg; }
+
+  /* The tutorial hand sits under the tube to tap next. */
+  function placeHand() {
+    if (!isTut() || S.won || S.done) { if (handEl) handEl.remove(); return; }
+    if (!handEl) {
+      handEl = el('span', 'hand');
+      handEl.setAttribute('aria-hidden', 'true');
+      if (IMG.hand) {
+        const im = el('img'); im.src = IMG.hand; im.alt = '';
+        handEl.appendChild(im);
+      } else {
+        handEl.innerHTML = '<svg viewBox="0 0 48 58"><path d="M16 7a5 5 0 0 1 10 0v18l11 2.600a6 6 0 0 1 4.600 6.600l-1.700 13a8 8 0 0 1-7.900 6.800H21.500a8 8 0 0 1-6.600-3.500L5.600 38a3.500 3.500 0 0 1 5.400-4.400l5 4.400z"/></svg>';
+      }
+    }
+    let target = L.tutorialFirstTube;
+    if (sel !== null) {
+      target = -1;
+      for (let i = 0; i < S.board.length; i++) if (Engine.canPour(S.board, sel, i, CAP)) { target = i; break; }
+    }
+    if (target < 0 || !tubes[target]) { handEl.remove(); return; }
+    if (handEl.parentNode !== tubes[target].slot) tubes[target].slot.appendChild(handEl);
+  }
+
+  function refresh() {
+    stuck = !S.won && !S.done && !Engine.hasMoves(S.board, CAP);
+    paintAll(); paintHud(); paintStatus(); placeHand();
+  }
+
+  /* =====================================================================
+     Playing
+     ===================================================================== */
+  /* Open a level.
+     mode 'saved' = carry on with the saved board (start-up).
+     mode 'fresh' = deal it again to play (Restart).
+     no mode      = arrive at the level: a level you already cleared is shown finished and
+                    stays cleared; an unfinished level you left comes back as you left it. */
+  function openLevel(n, mode) {
+    cancelAnim();
+    if (mode !== 'saved' || !S.board) {
+      const leavingUnfinished = S.board && S.level !== n && !S.won && !S.done && S.history.length > 0;
+      if (leavingUnfinished) {
+        S.stash = { level: S.level, board: S.board, pours: S.pours, history: S.history, extra: S.extra };
+      }
+      S.won = false; S.done = false;
+      if (mode !== 'fresh' && S.stash && S.stash.level === n) {
+        S.board = S.stash.board; S.pours = S.stash.pours; S.history = S.stash.history; S.extra = S.stash.extra;
+        S.stash = null;
+      } else {
+        if (S.stash && S.stash.level === n) S.stash = null;
+        S.board = Engine.makeLevel(n, L, SHOP.colourCount);
+        S.pours = 0; S.history = []; S.extra = 0;
+        if (mode !== 'fresh' && n <= S.cleared) {
+          S.board = Engine.finishedBoard(S.board, CAP, L.hintNodes);
+          S.done = true;
+        }
+      }
+    }
+    S.level = n;
+    sel = null; hint = null; plan = null; statusMsg = '';
+    buildBoard();
+    refresh();
+    save();
+  }
+
+  function tapTube(i) {
+    if (S.won || S.done || !tubes[i]) return;
+    if (busy) { if (queue.length < A.queueMax) queue.push(i); return; }
+    const b = S.board;
+    hint = null;
+    statusMsg = '';
+    if (sel === i) {
+      sel = null;                                            // tap again: put it down
+    } else if (sel !== null && Engine.canPour(b, sel, i, CAP)) {
+      startPour(sel, i);
+      return;
+    } else if (Engine.isFinished(b[i], CAP)) {
+      statusMsg = T.tubeIsDone;                              // corked tubes cannot be picked
+    } else if (!b[i].length) {
+      statusMsg = T.tubeIsEmpty;
+    } else {
+      sel = i;                                               // pick it (also when the pour was not allowed)
+      Sound.select(); buzz(SND.buzzSelect);
+    }
+    paintAll(); paintStatus(); placeHand();
+  }
+
+  function startPour(from, to) {
+    const colour = S.board[from][S.board[from].length - 1];
+    const before = S.board[to].length;
+    const n = Engine.pour(S.board, from, to, CAP);
+    S.history.push([from, to, n]);
+    S.pours++;
+    const next = plan && plan.moves[plan.i];
+    if (next && next[0] === from && next[1] === to) plan.i++; else plan = null;
+    sel = null;
+    const done = Engine.isFinished(S.board[to], CAP);
+    if (Engine.isCleared(S.board, CAP)) settleWin();
+    save();
+    announce(fmt(T.srPoured, { n: n, c: T.colourNames[colour], b: to + 1 }));
+
+    if (motionOff()) {
+      syncBands(from); syncBands(to);
+      paintAll(); paintHud();
+      if (done) corked(to);
+      afterPour();
+      return;
+    }
+    busy = true;
+    filling = to;
+    paintAll(); paintHud(); paintStatus();
+    if (handEl) handEl.remove();
+    animatePour(from, to, n, colour, before, done).then(function (finished) {
+      if (finished) afterPour();
+    });
+  }
+
+  /* The pour: fly over, tilt, stream, move the liquid, stream off, fly back. */
+  async function animatePour(from, to, n, colour, before, done) {
+    const token = ++animToken;
+    const live = function () { return token === animToken; };
+    const src = tubes[from], dst = tubes[to];
+    const sr = src.slot.getBoundingClientRect(), dr = dst.slot.getBoundingClientRect();
+    const app = appEl.getBoundingClientRect();
+    const rad = A.tiltAngle * Math.PI / 180;
+    const lipX = geom.tw / 2 * Math.cos(rad), lipY = geom.tw / 2 * Math.sin(rad);
+    const reach = geom.th * Math.sin(rad);
+    const cx = dr.left + dr.width / 2;
+    /* dir 1: the tube comes in on the left of the target and tilts clockwise */
+    let dir = sr.left < dr.left - 1 ? 1 : sr.left > dr.left + 1 ? -1 : (cx > app.left + app.width / 2 ? 1 : -1);
+    const spill = function (d) { return d === 1 ? Math.max(0, app.left - (cx - reach)) : Math.max(0, cx + reach - app.right); };
+    if (spill(dir) > spill(-dir)) dir = -dir;                // keep the tilted tube on screen
+    const hover = geom.tw * A.hover;
+    const dx = cx - dir * lipX - (sr.left + sr.width / 2);
+    const dy = dr.top - hover - lipY - sr.top;
+
+    src.el.classList.add('pouring');
+    src.el.style.transition = 'translate ' + A.travel + 'ms ease-in-out, rotate ' + A.tilt + 'ms ease-in-out ' + A.tiltDelay + 'ms';
+    src.el.style.translate = dx + 'px ' + dy + 'px';
+    src.el.style.rotate = (dir * A.tiltAngle) + 'deg';
+    await sleep(Math.max(A.travel, A.tiltDelay + A.tilt));
+    if (!live()) return false;
+
+    /* stream from the pouring lip down to the liquid surface in the target */
+    const sw = Math.max(3, Math.round(geom.tw * A.streamWidth));
+    const y0 = dr.top - hover - 1, y1 = dr.top + geom.th - 2 - before * geom.bh;
+    const stream = el('i', 'stream');
+    stream.style.cssText = 'left:' + (cx - sw / 2) + 'px;top:' + y0 + 'px;width:' + sw + 'px;height:' + Math.max(4, y1 - y0) + 'px;transition-duration:' + A.streamIn + 'ms';
+    stream.style.setProperty('--c', 'var(--liq-' + colour + ')');
+    fxEl.appendChild(stream);
+    stream.getBoundingClientRect();
+    stream.style.transform = 'scaleY(1)';
+    await sleep(A.streamIn);
+    if (!live()) return false;
+
+    /* source bands shrink while target bands grow */
+    const time = A.pourBase + A.pourPerBand * n;
+    Sound.pour(time);
+    const leaving = Array.prototype.slice.call(src.liq.children, -n);
+    const arriving = [];
+    leaving.forEach(function (b) { b.style.transitionDuration = time + 'ms'; });
+    for (let k = 0; k < n; k++) {
+      const b = makeBand(colour);
+      b.style.height = '0px';
+      b.style.transitionDuration = time + 'ms';
+      dst.liq.appendChild(b);
+      arriving.push(b);
+    }
+    dst.liq.getBoundingClientRect();
+    leaving.forEach(function (b) { b.style.height = '0px'; });
+    arriving.forEach(function (b) { b.style.height = ''; });
+    await sleep(time);
+    if (!live()) return false;
+    leaving.forEach(function (b) { b.remove(); });
+    arriving.forEach(function (b) { b.style.transitionDuration = ''; });
+    filling = -1;
+    paintTube(to);
+    if (done) corked(to);
+
+    /* stream retracts into the target, then the tube goes home */
+    stream.style.transitionDuration = A.streamOut + 'ms';
+    stream.style.transformOrigin = '50% 100%';
+    stream.style.transform = 'scaleY(0)';
+    await sleep(A.streamOut);
+    if (!live()) return false;
+    stream.remove();
+    src.el.style.transition = 'translate ' + A.back + 'ms ease-in-out, rotate ' + A.back + 'ms ease-in-out';
+    src.el.style.translate = '';
+    src.el.style.rotate = '';
+    await sleep(A.back);
+    if (!live()) return false;
+    src.el.style.transition = '';
+    src.el.classList.remove('pouring');
+    busy = false;
+    return true;
+  }
+
+  /* A tube was just finished: pop, cork, thud, confetti. */
+  function corked(i) {
+    const t = tubes[i].el;
+    t.classList.remove('pop');
+    void t.offsetWidth;
+    t.classList.add('pop');
+    Sound.cork(); buzz(SND.buzzCork);
+    tubeConfetti(i);
+  }
+
+  function afterPour() {
+    if (S.won) {
+      queue.length = 0;
+      refresh();
+      Sound.win(); buzz(SND.buzzWin);
+      megaConfetti();
+      const token = animToken;
+      setTimeout(function () { if (token === animToken && S.won) showWin(); }, motionOff() ? 0 : A.winDelay);
+      return;
+    }
+    refresh();
+    while (queue.length && !busy) tapTube(queue.shift());   // play taps made during the pour
+  }
+
+  /* Stop any running pour at once and show the true board. */
+  function cancelAnim() {
+    animToken++;
+    queue.length = 0;
+    filling = -1;
+    if (!busy) return;
+    busy = false;
+    fxEl.textContent = '';
+    for (let i = 0; i < tubes.length; i++) {
+      const t = tubes[i].el;
+      t.style.transition = ''; t.style.translate = ''; t.style.rotate = '';
+      t.classList.remove('pouring');
+      resetBands(i);
+    }
+    paintAll();
+  }
+
+  function awardsEarned() {
+    return CONFIG.awards.filter(function (a) {
+      return a.type === 'buy' ? S.bought.length >= a.value : S.cleared >= a.value;
+    }).map(function (a) { return a.name; });
+  }
+  function newAwards(before) {
+    return awardsEarned().filter(function (name) { return before.indexOf(name) < 0; });
+  }
+
+  function settleWin() {
+    const before = awardsEarned();
+    const first = S.level > S.cleared;
+    if (first) { S.cleared = S.level; S.coins += L.coinsPerLevel; }
+    S.won = true;
+    winInfo = { first: first, awards: newAwards(before) };
+  }
+  function showWin() {
+    if (winEl.classList.contains('on')) return;
+    $('winTitle').textContent = fmt(T.winTitle, { n: S.level });
+    $('winBody').textContent = fmt(winInfo.first ? T.winBody : T.winBodyReplay, { pours: poursText(S.pours), coins: L.coinsPerLevel });
+    $('winAward').textContent = winInfo.awards.length ? fmt(T.awardEarned, { name: winInfo.awards.join(', ') }) : '';
+    openPop(winEl, $('winNext'));
+  }
+
+  function undo() {
+    cancelAnim();
+    if (S.won) { showWin(); return; }
+    if (S.done) return;
+    const m = S.history.pop();
+    if (!m) return;
+    Engine.unpour(S.board, m[0], m[1], m[2]);
+    S.pours = Math.max(0, S.pours - 1);
+    sel = null; hint = null; plan = null; statusMsg = T.undone;
+    syncBands(m[0]); syncBands(m[1]);
+    refresh(); save();
+  }
+
+  function showHint() {
+    cancelAnim();
+    if (S.won) { showWin(); return; }
+    if (S.done || isTut()) return;
+    sel = null;
+    if (!plan || !plan.moves[plan.i]) {
+      const result = Engine.solve(S.board, CAP, L.hintNodes);
+      if (!result.solved) {
+        hint = null; plan = null;
+        statusMsg = result.exhausted ? T.hintNone : T.hintUnsure;
+        paintAll(); paintStatus();
+        return;
+      }
+      plan = { moves: result.moves, i: 0 };
+    }
+    const m = plan.moves[plan.i];
+    if (!m) return;
+    hint = [m[0], m[1]];
+    statusMsg = fmt(T.hintSay, { a: m[0] + 1, b: m[1] + 1 });
+    paintAll(); paintStatus();
+  }
+
+  function addTube() {
+    cancelAnim();
+    if (S.won) { showWin(); return; }
+    if (S.done || isTut() || S.extra >= L.extraTubes) return;
+    S.board.push([]);
+    S.extra++;
+    sel = null; hint = null; plan = null; statusMsg = T.tubeAdded;
+    buildBoard(); refresh(); save();
+    $('btnRestart').focus({ preventScroll: true });
+  }
+
+  function restart() {
+    openLevel(S.level, 'fresh');
+    statusMsg = T.restarted;
+    paintStatus();
+  }
+  function stepLevel(d) {
+    const n = S.level + d;
+    if (n < 1 || n > reached()) return;
+    openLevel(n);
+  }
+
+  /* =====================================================================
+     Screens and pop-ups
+     ===================================================================== */
+  function show(name) {
+    Object.keys(screens).forEach(function (k) {
+      const on = k === name;
+      screens[k].classList.toggle('on', on);
+      screens[k].inert = !on;
+    });
+    currentScreen = name;
+    if (name === 'game') layout();
+  }
+  let popReturnFocus = null;
+  function openPop(pop, focusEl) {
+    popReturnFocus = document.activeElement;
+    screens[currentScreen].inert = true;
+    pop.classList.add('on');
+    setTimeout(function () { if (pop.classList.contains('on')) focusEl.focus({ preventScroll: true }); }, 60);
+  }
+  function closePop(pop) {
+    if (!pop.classList.contains('on')) return;
+    pop.classList.remove('on');
+    screens[currentScreen].inert = false;
+    if (popReturnFocus && popReturnFocus.focus) popReturnFocus.focus({ preventScroll: true });
+    popReturnFocus = null;
+  }
+
+  function coinsEverywhere() {
+    $('homeCoins').textContent = S.coins;
+    $('shopCoins').textContent = S.coins;
+    const spoken = fmt(T.coinsSpoken, { n: S.coins });
+    $('homeCoinPill').setAttribute('aria-label', spoken);
+    $('shopCoinPill').setAttribute('aria-label', spoken);
+    $('homeCoinPill').setAttribute('role', 'img');
+    $('shopCoinPill').setAttribute('role', 'img');
+  }
+  function renderHome() {
+    $('homeLevel').textContent = S.level;
+    coinsEverywhere();
+    $('btnSound').classList.toggle('off', !S.sound);
+    $('btnSound').setAttribute('aria-pressed', S.sound ? 'true' : 'false');
+    $('lblSound').textContent = S.sound ? T.soundOn : T.soundOff;
+    $('btnBuzz').classList.toggle('off', !S.buzz);
+    $('btnBuzz').setAttribute('aria-pressed', S.buzz ? 'true' : 'false');
+    $('lblBuzz').textContent = S.buzz ? T.buzzOn : T.buzzOff;
+  }
+  function goHome() {
+    cancelAnim();
+    if (S.won) closePop(winEl);
+    if (S.won || S.done) openLevel(reached());     // Home always leads back to the level still to clear
+    sel = null; hint = null;
+    paintAll(); paintStatus(); placeHand();
+    renderHome();
+    show('home');
+    $('btnPlay').focus({ preventScroll: true });
+  }
+  function nextLevel() {
+    closePop(winEl);
+    openLevel(Math.min(S.level + 1, reached()));
+  }
+
+  /* Apply the chosen tube, backdrop, colour set and symbols to the page. */
+  function applyLook() {
+    root.dataset.backdrop = S.backdrop;
+    root.dataset.colours = S.colours;
+    boardEl.dataset.tube = S.tube;
+    root.classList.toggle('symbols', !!S.symbols);
+    $('chkSymbols').checked = !!S.symbols;
+    const bd = find(SHOP.backdrops, S.backdrop);
+    const pic = (bd && bd.image) || IMG.background;
+    $('bg').style.setProperty('--bg-image', pic ? 'url("' + pic + '")' : 'none');
+  }
+
+  /* ---------- shop ---------- */
+  function shopSay(msg) { $('shopMsg').textContent = msg; }
+  function openShop(tab) {
+    shopTab = tab;
+    shopSay('');
+    renderShop();
+    show('shop');
+    $('btnBack').focus({ preventScroll: true });
+  }
+  function previewFor(kind, item) {
+    const p = el('span', 'preview');
+    if (kind === 'tubes') {
+      p.dataset.tube = item.id;
+      const tube = el('span', 'tube done'), glass = el('span', 'glass'), liq = el('span', 'liquid');
+      [5, 5, 2, 8].forEach(function (c) {
+        const b = el('span', 'band');
+        b.style.setProperty('--c', 'var(--liq-' + c + ')');
+        liq.appendChild(b);
+      });
+      glass.appendChild(liq); glass.appendChild(el('span', 'shine'));
+      tube.appendChild(glass);
+      p.appendChild(tube);
+    } else if (kind === 'backdrops') {
+      p.className = 'preview swatch';
+      p.dataset.backdrop = item.id;
+      if (item.image) p.style.backgroundImage = 'url("' + item.image + '")';
+    } else {
+      p.className = 'preview dots';
+      p.dataset.colours = item.id;
+      for (let c = 0; c < SHOP.colourCount; c++) {
+        const dot = el('i');
+        dot.style.setProperty('--c', 'var(--liq-' + c + ')');
+        p.appendChild(dot);
+      }
+    }
+    return p;
+  }
+  function shopItems(kind) { return kind === 'tubes' ? SHOP.tubes : kind === 'backdrops' ? SHOP.backdrops : SHOP.colourSets; }
+  function chosenKey(kind) { return kind === 'tubes' ? 'tube' : kind === 'backdrops' ? 'backdrop' : 'colours'; }
+  function isOwned(kind, item) {
+    if (kind === 'tubes') return reached() >= item.level;
+    return !item.price || S.bought.indexOf(kind + ':' + item.id) >= 0;
+  }
+  function renderShop(focusId) {
+    coinsEverywhere();
+    document.querySelectorAll('.tab').forEach(function (tab) {
+      const on = tab.dataset.tab === shopTab;
+      tab.classList.toggle('accent', on);
+      tab.classList.toggle('frost', on);
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    const grid = $('shopGrid');
+    grid.textContent = '';
+    shopItems(shopTab).forEach(function (item) {
+      const owned = isOwned(shopTab, item), using = S[chosenKey(shopTab)] === item.id;
+      let state;
+      if (using) state = T.inUse;
+      else if (owned) state = T.tapToUse;
+      else if (shopTab === 'tubes') state = fmt(T.reachLevel, { n: item.level });
+      else state = fmt(T.price, { n: item.price });
+      const card = el('button', 'frost btn card-btn' + (using ? ' in-use' : '') + (owned ? '' : ' locked'));
+      card.type = 'button';
+      card.dataset.id = item.id;
+      card.appendChild(previewFor(shopTab, item));
+      card.appendChild(el('span', 'card-name', item.name));
+      card.appendChild(el('span', 'card-state', state));
+      grid.appendChild(card);
+      if (focusId === item.id) card.focus({ preventScroll: true });
+    });
+  }
+  function pickShopItem(id) {
+    const kind = shopTab, item = find(shopItems(kind), id);
+    if (!item) return;
+    let msg;
+    if (!isOwned(kind, item)) {
+      if (kind === 'tubes') { shopSay(fmt(T.needLevel, { n: item.level, name: item.name })); return; }
+      if (S.coins < item.price) { shopSay(fmt(T.needCoins, { n: item.price - S.coins })); return; }
+      const before = awardsEarned();
+      S.coins -= item.price;
+      S.bought.push(kind + ':' + item.id);
+      msg = fmt(T.bought, { name: item.name });
+      const got = newAwards(before);
+      if (got.length) msg += ' ' + fmt(T.awardEarned, { name: got.join(', ') });
+    } else {
+      msg = fmt(T.nowUsing, { name: item.name });
+    }
+    S[chosenKey(kind)] = item.id;
+    if (kind === 'backdrops') S.backdropPicked = true;
+    applyLook();
+    save();
+    renderShop(item.id);
+    shopSay(msg);
+  }
+
+  /* ---------- awards ---------- */
+  function openAwards() {
+    const list = $('awardList'), have = awardsEarned();
+    list.textContent = '';
+    CONFIG.awards.forEach(function (a) {
+      const got = have.indexOf(a.name) >= 0;
+      const li = el('li', got ? 'earned' : '');
+      const tick = el('span', 'tick');
+      tick.innerHTML = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.500 4.500 4.500L19 7.500"/></svg>';
+      const body = el('span');
+      body.appendChild(el('b', '', a.name));
+      body.appendChild(el('small', '', a.how));
+      body.appendChild(el('span', 'sr-only', ', ' + (got ? T.earned : T.notEarned)));
+      li.appendChild(tick); li.appendChild(body);
+      list.appendChild(li);
+    });
+    openPop(awardsEl, $('awardsClose'));
+  }
+
+  /* =====================================================================
+     Start-up: labels, pictures, buttons, touch and keyboard
+     ===================================================================== */
+  function applyText() {
+    document.title = T.title;
+    document.querySelectorAll('[data-t]').forEach(function (e) { e.textContent = T[e.dataset.t] || ''; });
+    document.querySelectorAll('[data-tl]').forEach(function (e) { e.setAttribute('aria-label', T[e.dataset.tl] || ''); });
+  }
+  function applyImages() {
+    if (IMG.logo) {
+      const im = el('img'); im.src = IMG.logo; im.alt = T.title;
+      $('homeTitle').textContent = ''; $('homeTitle').appendChild(im);
+    }
+    if (IMG.homeBadge) {
+      $('homeBadge').classList.add('img');
+      $('homeBadge').classList.remove('frost');
+      $('homeBadge').style.setProperty('--badge-image', 'url("' + IMG.homeBadge + '")');
+    }
+    if (IMG.coin) {
+      root.classList.add('coin-img');
+      root.style.setProperty('--coin-image', 'url("' + IMG.coin + '")');
+    }
+  }
+
+  function bind() {
+    /* Tubes answer on pointer-down so there is no tap delay. Keyboard and
+       screen-reader activation arrive as a click with no pointer-down. */
+    boardEl.addEventListener('pointerdown', function (e) {
+      const t = e.target.closest('.tube');
+      if (!t || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      lastPointerDown = performance.now();
+      tapTube(+t.dataset.i);
+    });
+    boardEl.addEventListener('click', function (e) {
+      const t = e.target.closest('.tube');
+      if (!t || performance.now() - lastPointerDown < 700) return;
+      tapTube(+t.dataset.i);
+    });
+    boardEl.addEventListener('keydown', function (e) {
+      const t = e.target.closest('.tube');
+      if (!t) return;
+      const i = +t.dataset.i;
+      let j = i;
+      if (e.key === 'ArrowRight') j = i + 1;
+      else if (e.key === 'ArrowLeft') j = i - 1;
+      else if (e.key === 'ArrowDown') j = i + geom.per;
+      else if (e.key === 'ArrowUp') j = i - geom.per;
+      else return;
+      e.preventDefault();
+      if (tubes[j]) tubes[j].el.focus({ preventScroll: true });
+    });
+    boardEl.addEventListener('animationend', function (e) {
+      if (e.animationName === 'pop') { const t = e.target.closest('.tube'); if (t) t.classList.remove('pop'); }
+    });
+
+    $('btnHome').addEventListener('click', goHome);
+    $('btnPrev').addEventListener('click', function () { stepLevel(-1); });
+    $('btnNext').addEventListener('click', function () { stepLevel(1); });
+    $('btnUndo').addEventListener('click', undo);
+    $('btnHint').addEventListener('click', showHint);
+    $('btnAdd').addEventListener('click', addTube);
+    $('btnRestart').addEventListener('click', restart);
+    $('chkSymbols').addEventListener('change', function (e) { S.symbols = e.target.checked; applyLook(); save(); });
+
+    $('btnPlay').addEventListener('click', function () {
+      Sound.get();
+      show('game');
+      refresh();
+      if (tubes[0]) tubes[0].el.focus({ preventScroll: true });
+    });
+    $('btnSound').addEventListener('click', function () { S.sound = !S.sound; renderHome(); save(); if (S.sound) Sound.select(); });
+    $('btnBuzz').addEventListener('click', function () { S.buzz = !S.buzz; renderHome(); save(); buzz(SND.buzzCork); });
+    $('btnTubes').addEventListener('click', function () { openShop('tubes'); });
+    $('btnThemes').addEventListener('click', function () { openShop('backdrops'); });
+    $('btnAwards').addEventListener('click', openAwards);
+
+    $('btnBack').addEventListener('click', function () { renderHome(); show('home'); $('btnPlay').focus({ preventScroll: true }); });
+    document.querySelectorAll('.tab').forEach(function (tab) {
+      tab.addEventListener('click', function () { shopTab = tab.dataset.tab; shopSay(''); renderShop(); });
+    });
+    $('shopGrid').addEventListener('click', function (e) {
+      const card = e.target.closest('.card-btn');
+      if (card) pickShopItem(card.dataset.id);
+    });
+
+    $('winHome').addEventListener('click', goHome);
+    $('winNext').addEventListener('click', nextLevel);
+    $('awardsClose').addEventListener('click', function () { closePop(awardsEl); });
+    $('awardsScrim').addEventListener('click', function () { closePop(awardsEl); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (awardsEl.classList.contains('on')) closePop(awardsEl);
+      else if (currentScreen === 'shop') $('btnBack').click();
+    });
+
+    document.addEventListener('touchstart', function () {}, { passive: true });   // lets :active work on iOS
+    window.addEventListener('resize', layout);
+    if (window.ResizeObserver) new ResizeObserver(layout).observe(boardEl);
+    window.addEventListener('pagehide', save);
+  }
+
+  function init() {
+    applyText();
+    applyImages();
+    load();
+    const firstVisit = !S.launched;
+    S.launched = true;
+    applyLook();
+    bind();
+    if (S.won || S.done) {             // closed on a finished level: carry on with the level still to clear
+      S.level = reached();
+      S.board = null; S.won = false; S.done = false;
+    }
+    openLevel(S.level, 'saved');
+    renderHome();
+    show(firstVisit ? 'game' : 'home');   // very first visit goes straight into level 1
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
